@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+    {{ template "header" . }}
+    <body>
+        <main>
+            <h1>Karon</h1>
+
+            <h2>Pågående möten</h2>
+            {{ range .actives }}
+            {{ end }}
+
+            <h2>Inaktiva möten</h2>
+            {{ range .inactives }}
+            {{ end }}
+        </main>
+    </body>
+</html>
