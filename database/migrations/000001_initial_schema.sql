@@ -1,4 +1,5 @@
-CREATE TABLE IF NOT EXISTS meetings (
+-- +goose Up
+CREATE TABLE meetings (
     meeting_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     meeting_name text NOT NULL CHECK (char_length(meeting_name) > 0),
     meeting_date date NOT NULL DEFAULT CURRENT_DATE,
@@ -8,7 +9,7 @@ CREATE TABLE IF NOT EXISTS meetings (
     kerberos_token uuid UNIQUE NOT NULL DEFAULT gen_random_uuid()
 );
 
-CREATE TABLE IF NOT EXISTS attendances (
+CREATE TABLE attendances (
     meeting_id uuid NOT NULL REFERENCES meetings (meeting_id) ON DELETE CASCADE,
     email text NOT NULL,
     entered_at timestamptz NOT NULL DEFAULT now(),
@@ -19,3 +20,7 @@ CREATE TABLE IF NOT EXISTS attendances (
     PRIMARY KEY (meeting_id, email, entered_at),
     CONSTRAINT check_dates CHECK (left_at IS NULL OR (left_at >= entered_at))
 );
+
+-- +goose Down
+DROP TABLE attendances;
+DROP TABLE meetings;

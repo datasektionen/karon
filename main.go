@@ -1,49 +1,44 @@
 package main
 
 import (
+	"embed"
 	"net/http"
 	"text/template"
 
-	_ "github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/pressly/goose/v3"
 )
 
-// func hello(w http.ResponseWriter, req *http.Request) {
-// 	fmt.Fprintf(w, "hello\n")
-// }
-//
-// func headers(w http.ResponseWriter, req *http.Request) {
-// 	for name, headers := range req.Header {
-// 		for _, h := range headers {
-// 			fmt.Fprintf(w, "%v: %v\n", name, h)
-// 		}
-// 	}
-// }
+//go:embed client/templates/* client/public/*
+var files embed.FS
+
+//go:embed database/migrations/*.sql
+var embedMigrations embed.FS
 
 func main() {
-	// db, err := sqlx.Connect("postgres", "user=foo dbname=bar sslmode=disable")
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
-	//
-	// db.MustExec("dldl")
+	conf := GetConfig()
 
-	fs := http.FileServer(http.Dir("./client/public"))
-	http.Handle("/public/", http.StripPrefix("/public/", fs))
+	db := sqlx.MustConnect("postgres", conf.DATABASE_URL)
+	goose.SetBaseFS(embedMigrations)
+	if err := goose.SetDialect("postgres"); err != nil {
+		panic(err)
+	}
+	if err := goose.Up(db.DB, "database/migrations"); err != nil {
+		panic(err)
+	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		tmpl, err := template.ParseFiles(
-			"./client/templates/home.html",
-			"./client/templates/header.html",
-		)
+		tmpl, err := template.ParseFS(files, "client/templates/home.html", "client/templates/header.html")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
 		tmpl.Execute(w, nil)
 	})
 
-	println("Server running at http://localhost:8080")
+	publicFiles := http.FS(files)
+	http.Handle("/public/", http.FileServer(publicFiles))
+
 	http.ListenAndServe(":8080", nil)
 }
