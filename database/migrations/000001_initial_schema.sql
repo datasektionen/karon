@@ -21,6 +21,10 @@ CREATE TABLE attendances (
     CONSTRAINT check_dates CHECK (left_at IS NULL OR (left_at >= entered_at))
 );
 
+CREATE UNIQUE INDEX idx_one_active_attendance_per_meeting
+    ON attendances (meeting_id, email)
+    WHERE (left_at IS NULL);
+
 -- +goose Down
 DROP TABLE attendances;
 DROP TABLE meetings;
