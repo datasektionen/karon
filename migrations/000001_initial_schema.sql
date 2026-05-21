@@ -1,4 +1,3 @@
--- +goose Up
 CREATE TABLE meetings (
     meeting_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     meeting_name text NOT NULL CHECK (char_length(meeting_name) > 0),
@@ -24,7 +23,3 @@ CREATE TABLE attendances (
 CREATE UNIQUE INDEX idx_one_active_attendance_per_meeting
     ON attendances (meeting_id, email)
     WHERE (left_at IS NULL);
-
--- +goose Down
-DROP TABLE attendances;
-DROP TABLE meetings;

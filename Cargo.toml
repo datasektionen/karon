@@ -1,0 +1,25 @@
+[package]
+name = "karon"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-files = "0.6.10"
+actix-web = "4.13.0"
+askama = "0.16.0"
+chrono = "0.4.44"
+openidconnect = "4.0.1"
+reqwest = "0.13.3"
+sqlx = { version = "0.8.6", features = [
+    "runtime-tokio",
+    "postgres",
+    "migrate",
+    "uuid",
+    "chrono",
+]}
+tracing = "0.1.44"
+tracing-actix-web = "0.7.21"
+tracing-log = "0.2.0"
+tracing-subscriber = { version = "0.3.23", features = [
+    "env-filter"
+]}
