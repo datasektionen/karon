@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO meetings (meeting_name, meeting_date, voteit_token)\n        VALUES ($1, $2, $3)\n        RETURNING meeting_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "meeting_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Date",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "764c6e4e5ef4b3cb5b4d282f57cd18d1dab1a9f453c0e303514a882d04cf51d2"
+}

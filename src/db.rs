@@ -1,6 +1,8 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{PgPool, postgres::PgQueryResult, types::Uuid};
 
+use crate::voteit::VoteItToken;
+
 #[derive(Clone)]
 pub struct Db {
     pool: PgPool,
@@ -12,7 +14,7 @@ pub struct Meeting {
     pub meeting_date: NaiveDate,
     pub created_at: DateTime<Utc>,
     pub active: bool,
-    pub voteit_token: String,
+    pub voteit_token: VoteItToken,
     pub kerberos_token: Uuid,
 }
 
@@ -66,33 +68,50 @@ async fn is_meeting_active(db: &Db, id: Uuid) -> Result<bool, sqlx::Error> {
         .await
 }
 
-/*
-func UpdateAttendance(db *sqlx.DB, meetingID uuid.UUID, email string, ts time.Time, suffrage bool) error {
-    isActive, err := isMeetingActive(db, meetingID)
-    if err != nil {
-        return fmt.Errorf("meeting %s does not exist", meetingID)
-    }
-    if !isActive {
-        return fmt.Errorf("meeting %s is inactive", meetingID)
-    }
+pub enum Attendance {
+    Entered,
+    Left,
+}
 
-    query := `
+async fn update_attendance(
+    db: &Db,
+    meeting_id: Uuid,
+    email: String,
+    timestamp: DateTime<Utc>,
+    suffrage: bool,
+) -> Result<Attendance, sqlx::Error> {
+    let action = sqlx::query_scalar!(
+        r#"
         WITH updated AS (
             UPDATE attendances
             SET left_at = $1
             WHERE meeting_id = $2 AND email = $3 AND left_at IS NULL
-            RETURNING 1
+            RETURNING 'left' AS action
+        ),
+        inserted AS (
+            INSERT INTO attendances (meeting_id, email, entered_at, suffrage)
+            SELECT $2, $3, $1, $4
+            WHERE NOT EXISTS (SELECT 1 FROM updated)
+            RETURNING 'entered' AS action
         )
-        INSERT INTO attendances (meeting_id, email, entered_at, suffrage)
-        SELECT $2, $3, $1, $4
-        WHERE NOT EXISTS (SELECT 1 FROM updated);
-    `
+        SELECT action FROM updated
+        UNION ALL
+        SELECT action FROM inserted;
+        "#,
+        timestamp,
+        meeting_id,
+        email,
+        suffrage
+    )
+    .fetch_one(db.pool())
+    .await?;
 
-    _, err = db.Exec(query, ts, meetingID, email, suffrage)
-    if err != nil {
-        return fmt.Errorf("failed to toggle attendance for %s: %w", email, err)
+    let action_str = match action {
+        Some(a) => a,
+        None => return Err(sqlx::Error::RowNotFound),
+    };
+    match action_str.as_str() {
+        "left" => Ok(Attendance::Left),
+        _ => Ok(Attendance::Entered),
     }
-
-    return nil
 }
- * */

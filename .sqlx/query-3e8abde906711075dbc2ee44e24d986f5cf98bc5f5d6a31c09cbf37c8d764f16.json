@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM meetings",
+  "query": "SELECT * FROM meetings WHERE meeting_id=$1",
   "describe": {
     "columns": [
       {
@@ -40,7 +40,9 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Uuid"
+      ]
     },
     "nullable": [
       false,
@@ -52,5 +54,5 @@
       false
     ]
   },
-  "hash": "588fc6244c4b0747bb05f614a3edabc62bd0234d394a77737c071d0041bb8b70"
+  "hash": "3e8abde906711075dbc2ee44e24d986f5cf98bc5f5d6a31c09cbf37c8d764f16"
 }

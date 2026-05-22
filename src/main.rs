@@ -7,6 +7,8 @@ use tracing_log::LogTracer;
 use tracing_subscriber::EnvFilter;
 
 mod db;
+mod server;
+mod voteit;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -17,7 +19,7 @@ async fn main() -> std::io::Result<()> {
     //     .with_env_filter(EnvFilter::default())
     //     .init();
 
-    let pool = PgPool::connect(&env::var("DATABASE_URL").expect("databae not found"))
+    let pool = PgPool::connect(&env::var("DATABASE_URL").expect("database not found"))
         .await
         .expect("lol");
     sqlx::migrate!("./migrations")
