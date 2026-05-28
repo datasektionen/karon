@@ -4,8 +4,8 @@ use actix_web_httpauth::extractors::bearer::BearerAuth;
 use crate::{
     db::{self, Db, Meeting},
     server::Error,
-    sso,
-    voteit::{self, VoteItRequest},
+    sso::{self, check_moderator},
+    voteit::{self, Permissions, VoteItRequest},
 };
 
 #[post("/card")]
@@ -33,7 +33,12 @@ async fn card(
     meeting: Meeting,
 ) -> Result<(), Error> {
     // TODO: Very temporary code for testing
-    let perms = voteit::Permissions::default() | voteit::Permissions::DISCUSSER;
+    let mut perms = voteit::Permissions::default() | voteit::Permissions::DISCUSSER;
+
+    match check_moderator(kth_id).await {
+        Ok(true) => perms |= Permissions::MODERATOR,
+        _ => (),
+    };
 
     let req = VoteItRequest {
         meeting_id: meeting.meeting_id,

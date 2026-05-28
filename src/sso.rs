@@ -53,3 +53,7 @@ pub async fn get_kth_id(card_uid: &str) -> Result<String, Error> {
         _ => Err(Error::CardNotExisting(card_uid.to_string())),
     }
 }
+
+pub async fn check_moderator(kth_id: &str) -> Result<bool, Error> {
+    todo!()
+}

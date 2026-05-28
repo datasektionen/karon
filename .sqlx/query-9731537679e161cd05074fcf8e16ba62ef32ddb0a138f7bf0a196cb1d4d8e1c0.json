@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM meetings WHERE voteit_token=$1",
+  "query": "SELECT * FROM meetings WHERE kerberos_token=$1",
   "describe": {
     "columns": [
       {
@@ -41,7 +41,7 @@
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -54,5 +54,5 @@
       false
     ]
   },
-  "hash": "61a27c8886ceae010bc84c32bd5d197e442202001ec9d544da442900a0fa7b2e"
+  "hash": "9731537679e161cd05074fcf8e16ba62ef32ddb0a138f7bf0a196cb1d4d8e1c0"
 }

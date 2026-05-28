@@ -4,9 +4,9 @@ use actix_web::web::Data;
 use tokio::sync::mpsc::Receiver;
 
 use crate::{
-    db::{self, Db},
+    db::{self, Action, Db},
     server::Error,
-    voteit::{self, VoteItRequest},
+    voteit::{self, Permissions, VoteItRequest},
 };
 
 pub async fn work(db: Data<Db>, mut rx: Receiver<VoteItRequest>) {
@@ -22,6 +22,13 @@ pub async fn work(db: Data<Db>, mut rx: Receiver<VoteItRequest>) {
         .await
         .expect("Could not connect to database");
 
+        match action {
+            Action::Entered => (),
+            Action::Left => {
+                req.perms &= Permissions::default() | Permissions::MODERATOR;
+            }
+        };
+
         let mut sleep_time = 1;
 
         // TODO: We really should not silently just break when encountering errors. Log, maybe?
@@ -29,7 +36,7 @@ pub async fn work(db: Data<Db>, mut rx: Receiver<VoteItRequest>) {
             if sleep_time > 64 {
                 break;
             }
-            match voteit::update_attendance(action, &mut req).await {
+            match voteit::update_attendance(&req).await {
                 Ok(_) => break,
                 Err(Error::VoteItRequestFail(e)) => {
                     // TODO: Log this instead.

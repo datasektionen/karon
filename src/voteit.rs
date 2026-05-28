@@ -56,14 +56,7 @@ impl Default for Permissions {
     }
 }
 
-pub async fn update_attendance(action: Action, req: &mut VoteItRequest) -> Result<(), Error> {
-    match action {
-        Action::Entered => (),
-        Action::Left => {
-            req.perms &= Permissions::default() | Permissions::MODERATOR;
-        }
-    };
-
+pub async fn update_attendance(req: &VoteItRequest) -> Result<(), Error> {
     let body = body_builder(&req.email, req.perms);
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
