@@ -90,7 +90,7 @@ async fn update_attendance(
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?,
     );
 
-    let response = reqwest::Client::new()
+    reqwest::Client::new()
         .post(format!(
             "{}/token-api/invites/",
             &env::var("VOTEIT_URL").expect("VoteIT url not found")
@@ -99,15 +99,15 @@ async fn update_attendance(
         .json(&body)
         .send()
         .await
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::ConnectionAborted, e))?;
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::ConnectionRefused, e))?;
 
     Ok(())
 }
 
 fn body_builder(email: String, permissions: Permissions) -> Value {
-    let voteit_strings = permissions.to_voteit_strings();
+    let permission_strings = permissions.to_voteit_strings();
     json!({
-        "roles": voteit_strings,
+        "roles": permission_strings,
         "data": [
             {"email": email}
         ]
