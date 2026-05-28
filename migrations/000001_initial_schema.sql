@@ -20,6 +20,11 @@ CREATE TABLE attendances (
     CONSTRAINT check_dates CHECK (left_at IS NULL OR (left_at >= entered_at))
 );
 
+CREATE TABLE onboard_tokens (
+    kerberos_token uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at timestamptz NOT NULL DEFAULT now()
+)
+
 CREATE UNIQUE INDEX idx_one_active_attendance_per_meeting
     ON attendances (meeting_id, email)
     WHERE (left_at IS NULL);

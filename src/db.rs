@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{PgPool, postgres::PgQueryResult, types::Uuid};
 
-use crate::voteit::VoteItToken;
+use crate::{server::Error, voteit::VoteItToken};
 
 #[derive(Clone)]
 pub struct Db {
@@ -28,7 +28,7 @@ impl Db {
     }
 }
 
-async fn create_meeting(
+pub async fn create_meeting(
     db: &Db,
     name: String,
     date: NaiveDate,
@@ -50,19 +50,29 @@ async fn create_meeting(
     Ok(id)
 }
 
-async fn remove_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
+pub async fn remove_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
     sqlx::query!("DELETE FROM meetings WHERE meeting_id = $1", id)
         .execute(db.pool())
         .await
 }
 
-async fn get_meeting(db: &Db, id: Uuid) -> Result<Meeting, sqlx::Error> {
+pub async fn get_meeting(db: &Db, id: Uuid) -> Result<Meeting, sqlx::Error> {
     sqlx::query_as!(Meeting, "SELECT * FROM meetings WHERE meeting_id=$1", id)
         .fetch_one(db.pool())
         .await
 }
 
-async fn is_meeting_active(db: &Db, id: Uuid) -> Result<bool, sqlx::Error> {
+pub async fn get_meeting_from_token(db: &Db, token: &str) -> Result<Meeting, sqlx::Error> {
+    sqlx::query_as!(
+        Meeting,
+        "SELECT * FROM meetings WHERE voteit_token=$1",
+        token
+    )
+    .fetch_one(db.pool())
+    .await
+}
+
+pub async fn is_meeting_active(db: &Db, id: Uuid) -> Result<bool, sqlx::Error> {
     sqlx::query_scalar!("SELECT active FROM meetings WHERE meeting_id=$1", id)
         .fetch_one(db.pool())
         .await
@@ -73,7 +83,7 @@ pub enum Attendance {
     Left,
 }
 
-async fn update_attendance(
+pub async fn update_attendance(
     db: &Db,
     meeting_id: Uuid,
     email: String,
@@ -115,3 +125,12 @@ async fn update_attendance(
         _ => Ok(Attendance::Entered),
     }
 }
+
+// pub async fn verify_onboard_token(db: &Db, token: &str) -> Result<(), Error> {
+//     let time = sqlx::query_scalar!(
+//         "SELECT created_at FROM onboard_tokens  WHERE kerberos_token =$1",
+//         token
+//     )
+//     .fetch_one(db.pool())
+//     .await?;
+// }

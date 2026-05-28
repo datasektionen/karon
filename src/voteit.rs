@@ -1,13 +1,19 @@
 use std::env;
 
-use bitflags::bitflags;
+use bitflags::{bitflags, bitflags_match};
 use serde_json::{Value, json};
 
 pub type VoteItToken = String;
 
+pub struct VoteItRequest {
+    pub token: VoteItToken,
+    pub email: String,
+    pub perms: Permissions,
+}
+
 bitflags! {
     #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-    struct Permissions: u8 {
+    pub struct Permissions: u8 {
         const PARTICIPANT = 0b00001;
         const DISCUSSER   = 0b00010;
         const PROPOSER    = 0b00100;
@@ -16,77 +22,46 @@ bitflags! {
     }
 }
 
-const PARTICIPANT_STR: &str = "pa";
-const DISCUSSER_STR: &str = "di";
-const PROPOSER_STR: &str = "pr";
-const VOTER_STR: &str = "vo";
-const MODERATOR_STR: &str = "mo";
-
 impl Permissions {
-    fn to_voteit_strings(&self) -> Vec<&str> {
-        let mut perms = Vec::with_capacity(5);
-        if self.contains(Permissions::PARTICIPANT) {
-            perms.push(PARTICIPANT_STR);
-        }
-        if self.contains(Permissions::DISCUSSER) {
-            perms.push(DISCUSSER_STR);
-        }
-        if self.contains(Permissions::PROPOSER) {
-            perms.push(PROPOSER_STR);
-        }
-        if self.contains(Permissions::VOTER) {
-            perms.push(VOTER_STR);
-        }
-        if self.contains(Permissions::MODERATOR) {
-            perms.push(MODERATOR_STR);
-        }
-
-        perms
+    fn to_voteit_strings(&self) -> Vec<&'static str> {
+        self.iter()
+            .filter_map(|b| {
+                bitflags_match!(b, {
+                    Permissions::PARTICIPANT => Some("pa"),
+                    Permissions::DISCUSSER => Some("di"),
+                    Permissions::PROPOSER => Some("pr"),
+                    Permissions::VOTER => Some("vo"),
+                    Permissions::MODERATOR => Some("mo"),
+                    _ => None,
+                })
+            })
+            .collect()
     }
 }
 
 impl Default for Permissions {
     fn default() -> Self {
-        Self::PARTICIPANT | Self::DISCUSSER
+        Self::PARTICIPANT
     }
 }
 
-pub async fn check_in(
-    token: VoteItToken,
-    email: String,
-    suffrage: bool,
-    moderator: bool,
-) -> std::io::Result<()> {
-    let mut perms = Permissions::default();
-    if suffrage {
-        perms |= Permissions::VOTER | Permissions::PROPOSER;
-    }
-    if moderator {
-        perms |= Permissions::MODERATOR;
-    }
-
-    update_attendance(token, email, perms).await
+pub async fn check_in(req: VoteItRequest) -> std::io::Result<()> {
+    update_attendance(req).await
 }
 
-pub async fn check_out(token: VoteItToken, email: String, moderator: bool) -> std::io::Result<()> {
-    let mut perms = Permissions::default();
-    if moderator {
-        perms |= Permissions::MODERATOR;
-    }
+pub async fn check_out(mut req: VoteItRequest) -> std::io::Result<()> {
+    req.perms &= Permissions::MODERATOR;
+    req.perms |= Permissions::default();
 
-    update_attendance(token, email, perms).await
+    update_attendance(req).await
 }
 
-async fn update_attendance(
-    token: VoteItToken,
-    email: String,
-    permissions: Permissions,
-) -> std::io::Result<()> {
-    let body = body_builder(email, permissions);
+async fn update_attendance(req: VoteItRequest) -> std::io::Result<()> {
+    let body = body_builder(req.email, req.perms);
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         reqwest::header::AUTHORIZATION,
-        reqwest::header::HeaderValue::from_str(&format!("Api-Key {}", token))
+        reqwest::header::HeaderValue::from_str(&format!("Api-Key {}", req.token))
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?,
     );
 
