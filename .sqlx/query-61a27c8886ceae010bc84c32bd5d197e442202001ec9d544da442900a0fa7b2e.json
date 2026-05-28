@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM meetings WHERE voteit_token=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "meeting_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "meeting_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "meeting_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "voteit_token",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "kerberos_token",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "61a27c8886ceae010bc84c32bd5d197e442202001ec9d544da442900a0fa7b2e"
+}

@@ -2,11 +2,14 @@ use std::env;
 
 use bitflags::{bitflags, bitflags_match};
 use serde_json::{Value, json};
+use sqlx::types::Uuid;
+
+use crate::{db::Action, server::Error};
 
 pub type VoteItToken = String;
 
 pub struct VoteItRequest {
-    pub token: VoteItToken,
+    pub meeting_id: Uuid,
     pub email: String,
     pub perms: Permissions,
 }
@@ -23,7 +26,7 @@ bitflags! {
 }
 
 impl Permissions {
-    fn to_voteit_strings(&self) -> Vec<&'static str> {
+    pub fn to_voteit_strings(&self) -> Vec<&'static str> {
         self.iter()
             .filter_map(|b| {
                 bitflags_match!(b, {
@@ -37,6 +40,14 @@ impl Permissions {
             })
             .collect()
     }
+
+    pub fn no_permissions() -> Self {
+        Self::empty()
+    }
+
+    pub fn has_suffrage(&self) -> bool {
+        self.contains(Permissions::VOTER)
+    }
 }
 
 impl Default for Permissions {
@@ -45,24 +56,20 @@ impl Default for Permissions {
     }
 }
 
-pub async fn check_in(req: VoteItRequest) -> std::io::Result<()> {
-    update_attendance(req).await
-}
+pub async fn update_attendance(action: Action, req: &mut VoteItRequest) -> Result<(), Error> {
+    match action {
+        Action::Entered => (),
+        Action::Left => {
+            req.perms &= Permissions::default() | Permissions::MODERATOR;
+        }
+    };
 
-pub async fn check_out(mut req: VoteItRequest) -> std::io::Result<()> {
-    req.perms &= Permissions::MODERATOR;
-    req.perms |= Permissions::default();
-
-    update_attendance(req).await
-}
-
-async fn update_attendance(req: VoteItRequest) -> std::io::Result<()> {
-    let body = body_builder(req.email, req.perms);
+    let body = body_builder(&req.email, req.perms);
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         reqwest::header::AUTHORIZATION,
-        reqwest::header::HeaderValue::from_str(&format!("Api-Key {}", req.token))
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?,
+        reqwest::header::HeaderValue::from_str(&format!("Api-Key {}", req.meeting_id))
+            .map_err(|_| Error::ReqestParseError(req.meeting_id.to_string()))?,
     );
 
     reqwest::Client::new()
@@ -73,13 +80,12 @@ async fn update_attendance(req: VoteItRequest) -> std::io::Result<()> {
         .headers(headers)
         .json(&body)
         .send()
-        .await
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::ConnectionRefused, e))?;
+        .await?;
 
     Ok(())
 }
 
-fn body_builder(email: String, permissions: Permissions) -> Value {
+fn body_builder(email: &str, permissions: Permissions) -> Value {
     let permission_strings = permissions.to_voteit_strings();
     json!({
         "roles": permission_strings,

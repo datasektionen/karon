@@ -1,19 +1,30 @@
-use actix_web::{HttpResponse, ResponseError, http, post, web::Data};
-use actix_web_httpauth::extractors::bearer::BearerAuth;
+use actix_web::{HttpResponse, ResponseError, http};
 
-use crate::{
-    AppState, db, sso,
-    voteit::{self, VoteItRequest},
-};
+use crate::voteit::VoteItRequest;
+
+pub mod api;
+pub mod worker;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("database broken: {0}")]
     Database(#[from] sqlx::Error),
+    #[error("failed to parse UUID from string")]
+    UuidParseError(#[from] sqlx::types::uuid::Error),
     #[error("meeting not active")]
     MeetingNotActive,
     #[error("card {0} does not exist")]
     CardNotExisting(String),
+    #[error("token has expired")]
+    TokenExpired,
+    #[error("request data {0} failed to parse")]
+    ReqestParseError(String),
+    #[error("card uid already exists in SSO")]
+    CardConflict,
+    #[error("failed to send VoteIT request on MPSC channel")]
+    MpscSendError(#[from] tokio::sync::mpsc::error::SendError<VoteItRequest>),
+    #[error("failed to send VoteIT request to VoteIT: {0}")]
+    VoteItRequestFail(#[from] reqwest::Error),
 }
 
 impl ResponseError for Error {
@@ -29,36 +40,3 @@ impl ResponseError for Error {
         HttpResponse::build(code).body(self.to_string())
     }
 }
-
-#[post("/card")]
-pub async fn card_api(
-    data: Data<AppState>,
-    card_uid: String,
-    token: BearerAuth,
-) -> Result<HttpResponse, Error> {
-    let meeting = db::get_meeting_from_token(&data.db, token.token()).await?;
-    if !meeting.active {
-        return Err(Error::MeetingNotActive);
-    }
-
-    let kth_id = sso::get_kth_id(card_uid).await?;
-    let perms = voteit::Permissions::default() | voteit::Permissions::DISCUSSER;
-
-    let req = VoteItRequest {
-        token: meeting.voteit_token,
-        email: format!("{kth_id}@kth.se"),
-        perms,
-    };
-
-    data.producer.send(req);
-
-    Ok(HttpResponse::build(http::StatusCode::OK).body(kth_id))
-}
-
-// #[post("/onboard")]
-// pub async fn onboard_api(
-//     data: Data<AppState>,
-//     card_uid: String,
-//     token: BearerAuth,
-// ) -> Result<HttpResponse, Error> {
-// }

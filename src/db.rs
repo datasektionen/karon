@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Days, NaiveDate, Utc};
 use sqlx::{PgPool, postgres::PgQueryResult, types::Uuid};
 
 use crate::{server::Error, voteit::VoteItToken};
@@ -62,14 +62,16 @@ pub async fn get_meeting(db: &Db, id: Uuid) -> Result<Meeting, sqlx::Error> {
         .await
 }
 
-pub async fn get_meeting_from_token(db: &Db, token: &str) -> Result<Meeting, sqlx::Error> {
+pub async fn get_meeting_from_token(db: &Db, token_str: &str) -> Result<Meeting, Error> {
+    let token = Uuid::parse_str(token_str)?;
     sqlx::query_as!(
         Meeting,
-        "SELECT * FROM meetings WHERE voteit_token=$1",
+        "SELECT * FROM meetings WHERE kerberos_token=$1",
         token
     )
     .fetch_one(db.pool())
     .await
+    .map_err(|e| e.into())
 }
 
 pub async fn is_meeting_active(db: &Db, id: Uuid) -> Result<bool, sqlx::Error> {
@@ -78,7 +80,8 @@ pub async fn is_meeting_active(db: &Db, id: Uuid) -> Result<bool, sqlx::Error> {
         .await
 }
 
-pub enum Attendance {
+#[derive(Clone, Copy, Debug)]
+pub enum Action {
     Entered,
     Left,
 }
@@ -86,10 +89,10 @@ pub enum Attendance {
 pub async fn update_attendance(
     db: &Db,
     meeting_id: Uuid,
-    email: String,
+    email: &str,
     timestamp: DateTime<Utc>,
     suffrage: bool,
-) -> Result<Attendance, sqlx::Error> {
+) -> Result<Action, sqlx::Error> {
     let action = sqlx::query_scalar!(
         r#"
         WITH updated AS (
@@ -121,16 +124,28 @@ pub async fn update_attendance(
         None => return Err(sqlx::Error::RowNotFound),
     };
     match action_str.as_str() {
-        "left" => Ok(Attendance::Left),
-        _ => Ok(Attendance::Entered),
+        "left" => Ok(Action::Left),
+        _ => Ok(Action::Entered),
     }
 }
 
-// pub async fn verify_onboard_token(db: &Db, token: &str) -> Result<(), Error> {
-//     let time = sqlx::query_scalar!(
-//         "SELECT created_at FROM onboard_tokens  WHERE kerberos_token =$1",
-//         token
-//     )
-//     .fetch_one(db.pool())
-//     .await?;
-// }
+pub async fn verify_onboard_token(db: &Db, token_str: &str) -> Result<(), Error> {
+    let token = Uuid::parse_str(token_str)?;
+    let time = sqlx::query_scalar!(
+        "SELECT created_at FROM onboard_tokens WHERE kerberos_token=$1",
+        token
+    )
+    .fetch_one(db.pool())
+    .await?;
+
+    let current_time = Utc::now();
+    if current_time
+        > time
+            .checked_add_days(Days::new(2))
+            .expect("Could not add time")
+    {
+        return Err(Error::TokenExpired);
+    }
+
+    Ok(())
+}

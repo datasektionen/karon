@@ -6,17 +6,12 @@ use tokio::sync::mpsc;
 use tracing_actix_web::TracingLogger;
 use tracing_subscriber::EnvFilter;
 
-use crate::{db::Db, voteit::VoteItRequest};
+use crate::{db::Db, server::worker::work};
 
 mod db;
 mod server;
 mod sso;
 mod voteit;
-
-pub struct AppState {
-    pub db: Db,
-    pub producer: tokio::sync::mpsc::Sender<VoteItRequest>,
-}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -34,21 +29,23 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to apply database migrations");
 
-    let (tx, mut rx) = mpsc::channel(32);
+    let (tx, rx) = mpsc::channel(64);
 
     println!("migration completed");
 
-    let data = Data::new(AppState {
-        db: Db::new(pool),
-        producer: tx,
-    });
+    let db = Data::new(Db::new(pool));
+
+    tokio::spawn(work(db.clone(), rx));
 
     HttpServer::new(move || {
         App::new()
-            .app_data(data.to_owned())
+            .app_data(db.clone())
+            .app_data(tx.to_owned())
             .wrap(middleware::Compress::default())
             .wrap(TracingLogger::default())
-            .service(server::card_api)
+            .service(server::api::card_api)
+            .service(server::api::onboard_api)
+            .service(server::api::card_onboard_api)
     })
     .bind(("0.0.0.0", 8080))?
     .run()
