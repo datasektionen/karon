@@ -1,6 +1,7 @@
 use crate::{server::Error, voteit::Permissions};
 
-enum MemberTypes {
+#[derive(Copy, Clone, Debug)]
+pub enum MemberTypes {
     Ordinary,
     Alumni,
     Guest,
@@ -46,14 +47,17 @@ pub async fn onboard(_card_uid: &str, _kth_id: &str) -> Result<(), Error> {
     todo!()
 }
 
-pub async fn get_kth_id(card_uid: &str) -> Result<String, Error> {
-    match card_uid {
-        "04:5D:31:02:E4:11:90" => Ok("osen".to_string()),
-        "ED:3C:4C:25" => Ok("frblo".to_string()),
-        _ => Err(Error::CardNotExisting(card_uid.to_string())),
-    }
+#[derive(Debug)]
+pub struct Member {
+    pub kth_id: String,
+    pub email: String,
+    pub member_type: MemberTypes,
+}
+
+pub async fn get_member_info(card_uid: &str) -> Result<Member, Error> {
+    todo!()
 }
 
 pub async fn check_moderator(kth_id: &str) -> Result<bool, Error> {
-    todo!()
+    Ok(false)
 }

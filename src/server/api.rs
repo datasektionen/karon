@@ -4,7 +4,7 @@ use actix_web_httpauth::extractors::bearer::BearerAuth;
 use crate::{
     db::{self, Db, Meeting},
     server::Error,
-    sso::{self, check_moderator},
+    sso::{self, Member, check_moderator},
     voteit::{self, Permissions, VoteItRequest},
 };
 
@@ -15,35 +15,39 @@ pub async fn card_api(
     card_uid: String,
     token: BearerAuth,
 ) -> Result<HttpResponse, Error> {
-    let kth_id = sso::get_kth_id(&card_uid).await?;
+    let member_info = sso::get_member_info(&card_uid).await?;
 
     let meeting = db::get_meeting_from_token(&db, token.token()).await?;
     if !meeting.active {
         return Err(Error::MeetingNotActive);
     }
 
-    card(tx, &kth_id, meeting).await?;
+    card(tx, &member_info, meeting).await?;
 
-    Ok(HttpResponse::build(http::StatusCode::OK).body(kth_id))
+    Ok(HttpResponse::build(http::StatusCode::OK).body(member_info.kth_id))
 }
 
 async fn card(
     tx: Data<tokio::sync::mpsc::Sender<VoteItRequest>>,
-    kth_id: &str,
+    member_info: &Member,
     meeting: Meeting,
 ) -> Result<(), Error> {
-    // TODO: Very temporary code for testing
-    let mut perms = voteit::Permissions::default() | voteit::Permissions::DISCUSSER;
+    let mut perms: Permissions = member_info.member_type.into();
 
-    match check_moderator(kth_id).await {
+    if !perms.contains(voteit::Permissions::PARTICIPANT) {
+        return Err(Error::NonMember);
+    }
+
+    match check_moderator(&member_info.kth_id).await {
         Ok(true) => perms |= Permissions::MODERATOR,
         _ => (),
     };
 
     let req = VoteItRequest {
         meeting_id: meeting.meeting_id,
-        email: format!("{kth_id}@kth.se"),
+        email: member_info.email.clone(),
         perms,
+        voteit_token: meeting.voteit_token,
     };
 
     tx.send(req).await?;
@@ -58,23 +62,18 @@ pub async fn onboard_api(
 ) -> Result<HttpResponse, Error> {
     db::verify_onboard_token(&db, token.token()).await?;
 
+    onboard(req_body).await?;
+    Ok(HttpResponse::build(http::StatusCode::OK).body(""))
+}
+
+async fn onboard(req_body: String) -> Result<String, Error> {
     let (kth_id, card_uid) = match req_body.split_once('#') {
         Some(c) => c,
         None => return Err(Error::ReqestParseError(req_body)),
     };
 
     sso::onboard(card_uid, kth_id).await?;
-    Ok(HttpResponse::build(http::StatusCode::OK).body(""))
-}
-
-async fn onboard(req_body: &str) -> Result<String, Error> {
-    let (kth_id, card_uid) = match req_body.split_once('#') {
-        Some(c) => c,
-        None => return Err(Error::ReqestParseError(req_body.to_string())),
-    };
-
-    sso::onboard(card_uid, kth_id).await?;
-    Ok(kth_id.to_string())
+    Ok(card_uid.to_string())
 }
 
 #[post("/card/onboard")]
@@ -89,8 +88,9 @@ pub async fn card_onboard_api(
         return Err(Error::MeetingNotActive);
     }
 
-    let kth_id = onboard(&req_body).await?;
-    card(tx, &kth_id, meeting).await?;
+    let card_uid = onboard(req_body).await?;
+    let member_info = sso::get_member_info(&card_uid).await?;
+    card(tx, &member_info, meeting).await?;
 
-    Ok(HttpResponse::build(http::StatusCode::OK).body(kth_id))
+    Ok(HttpResponse::build(http::StatusCode::OK).body(member_info.kth_id))
 }

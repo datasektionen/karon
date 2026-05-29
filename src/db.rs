@@ -50,6 +50,24 @@ pub async fn create_meeting(
     Ok(id)
 }
 
+pub async fn enable_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        "UPDATE meetings SET active = true WHERE meeting_id = $1",
+        id
+    )
+    .execute(db.pool())
+    .await
+}
+
+pub async fn disable_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        "UPDATE meetings SET active = false WHERE meeting_id = $1",
+        id
+    )
+    .execute(db.pool())
+    .await
+}
+
 pub async fn remove_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
     sqlx::query!("DELETE FROM meetings WHERE meeting_id = $1", id)
         .execute(db.pool())

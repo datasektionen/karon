@@ -21,10 +21,12 @@ pub enum Error {
     ReqestParseError(String),
     #[error("card uid already exists in SSO")]
     CardConflict,
-    #[error("failed to send VoteIT request on MPSC channel")]
-    MpscSendError(#[from] tokio::sync::mpsc::error::SendError<VoteItRequest>),
     #[error("failed to send VoteIT request to VoteIT: {0}")]
     VoteItRequestFail(#[from] reqwest::Error),
+    #[error("VoteIT request queue full")]
+    RequestQueueFull(#[from] tokio::sync::mpsc::error::SendError<VoteItRequest>),
+    #[error("Person is not a member and has no permissions")]
+    NonMember,
 }
 
 impl ResponseError for Error {
@@ -35,6 +37,8 @@ impl ResponseError for Error {
     fn error_response(&self) -> HttpResponse<actix_web::body::BoxBody> {
         let code = match self {
             Error::CardNotExisting(_) => http::StatusCode::UNPROCESSABLE_ENTITY,
+            Error::RequestQueueFull(_) => http::StatusCode::TOO_MANY_REQUESTS,
+            Error::NonMember => http::StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS,
             _ => http::StatusCode::INTERNAL_SERVER_ERROR,
         };
         HttpResponse::build(code).body(self.to_string())

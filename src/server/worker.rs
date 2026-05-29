@@ -1,7 +1,10 @@
-use std::time::Duration;
+use std::{env, time::Duration};
 
 use actix_web::web::Data;
 use tokio::sync::mpsc::Receiver;
+use tracing_log::log;
+
+pub const WORKER_CHANNEL_SIZE: usize = 64;
 
 use crate::{
     db::{self, Action, Db},
@@ -31,20 +34,34 @@ pub async fn work(db: Data<Db>, mut rx: Receiver<VoteItRequest>) {
 
         let mut sleep_time = 1;
 
-        // TODO: We really should not silently just break when encountering errors. Log, maybe?
         loop {
-            if sleep_time > 64 {
-                break;
-            }
             match voteit::update_attendance(&req).await {
-                Ok(_) => break,
+                Ok(_) => {
+                    match action {
+                        Action::Entered => log::info!("{} has entered meeting", &req.email),
+                        Action::Left => log::info!("{} has left meeting", &req.email),
+                    };
+                    break;
+                }
+
                 Err(Error::VoteItRequestFail(e)) => {
-                    // TODO: Log this instead.
-                    println!("{:?}", e);
+                    if sleep_time > 64 {
+                        log::error!(
+                            "Unable to send requests to VoteIT ({}) for 127 seconds. Dropping packet {req} at {timestamp}.",
+                            &env::var("VOTEIT_URL").expect("VoteIT url not found"),
+                        );
+                        // TODO: Should we try to reverse the database entry?
+                        break;
+                    }
+
+                    log::info!(
+                        "Failed to send packet to VoteIT. Waiting {sleep_time} seconds.\n{e}"
+                    );
                     tokio::time::sleep(Duration::from_secs(sleep_time)).await;
                     sleep_time *= 2;
                     continue;
                 }
+                // TODO: We really should not silently just break when encountering errors.
                 _ => break,
             };
         }

@@ -1,17 +1,24 @@
-use std::env;
+use std::{env, fmt::Display};
 
 use bitflags::{bitflags, bitflags_match};
 use serde_json::{Value, json};
 use sqlx::types::Uuid;
 
-use crate::{db::Action, server::Error};
+use crate::server::Error;
 
 pub type VoteItToken = String;
 
 pub struct VoteItRequest {
     pub meeting_id: Uuid,
+    pub voteit_token: VoteItToken,
     pub email: String,
     pub perms: Permissions,
+}
+
+impl Display for VoteItRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} at meeting {}", self.email, self.meeting_id)
+    }
 }
 
 bitflags! {
@@ -33,7 +40,7 @@ impl Permissions {
                     Permissions::PARTICIPANT => Some("pa"),
                     Permissions::DISCUSSER => Some("di"),
                     Permissions::PROPOSER => Some("pr"),
-                    Permissions::VOTER => Some("vo"),
+                    Permissions::VOTER => Some("pv"),
                     Permissions::MODERATOR => Some("mo"),
                     _ => None,
                 })
@@ -61,7 +68,7 @@ pub async fn update_attendance(req: &VoteItRequest) -> Result<(), Error> {
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         reqwest::header::AUTHORIZATION,
-        reqwest::header::HeaderValue::from_str(&format!("Api-Key {}", req.meeting_id))
+        reqwest::header::HeaderValue::from_str(&format!("Api-Key {}", req.voteit_token))
             .map_err(|_| Error::ReqestParseError(req.meeting_id.to_string()))?,
     );
 

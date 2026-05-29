@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE meetings SET active = true WHERE meeting_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "37b896863d1f5d975b06e2a43c026da1722bc03f6ea68b8ded0c9f39fe34f27c"
+}
