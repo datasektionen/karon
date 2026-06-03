@@ -39,6 +39,7 @@ impl ResponseError for Error {
             Error::CardNotExisting(_) => http::StatusCode::UNPROCESSABLE_ENTITY,
             Error::RequestQueueFull(_) => http::StatusCode::TOO_MANY_REQUESTS,
             Error::NonMember => http::StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS,
+            Error::MeetingNotActive => http::StatusCode::GONE,
             _ => http::StatusCode::INTERNAL_SERVER_ERROR,
         };
         HttpResponse::build(code).body(self.to_string())

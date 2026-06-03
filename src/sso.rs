@@ -1,3 +1,5 @@
+use std::env;
+
 use crate::{server::Error, voteit::Permissions};
 
 #[derive(Copy, Clone, Debug)]
@@ -54,10 +56,54 @@ pub struct Member {
     pub member_type: MemberTypes,
 }
 
+impl From<SsoMember> for Member {
+    fn from(value: SsoMember) -> Self {
+        let email = format!("{}@kth.se", &value.kth_id);
+        Member {
+            kth_id: value.kth_id,
+            email,
+            member_type: value.member_type.as_str().into(),
+        }
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SsoMember {
+    pub kth_id: String,
+    pub member_type: String,
+}
+
 pub async fn get_member_info(card_uid: &str) -> Result<Member, Error> {
-    todo!()
+    let b: SsoMember = reqwest::Client::new()
+        .get(format!(
+            "{}/api/users?format=single&u={card_uid}",
+            &env::var("SSO_URL").expect("SSO URL not found.")
+        ))
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    Ok(b.into())
 }
 
 pub async fn check_moderator(kth_id: &str) -> Result<bool, Error> {
-    Ok(false)
+    const VOTEIT_MOD_PERM_ID: &str = "moderator";
+
+    match reqwest::Client::new()
+        .get(format!(
+            "{}/api/v1/user/{kth_id}/permission/{VOTEIT_MOD_PERM_ID}",
+            &env::var("HIVE_API_URL").expect("Hive URL not found.")
+        ))
+        .bearer_auth(&env::var("HIVE_API_KEY").expect("Hive KEY not found."))
+        .send()
+        .await?
+        .text()
+        .await?
+        .as_str()
+    {
+        "true" => Ok(true),
+        _ => Ok(false),
+    }
 }

@@ -12,6 +12,7 @@ bitflags = "2.11.1"
 chrono = "0.4.44"
 openidconnect = "4.0.1"
 reqwest = { version = "0.13.3", features = ["json"] }
+serde = "1.0.228"
 serde_json = "1.0.150"
 sqlx = { version = "0.8.6", features = [
     "runtime-tokio",

@@ -72,6 +72,7 @@ pub async fn update_attendance(req: &VoteItRequest) -> Result<(), Error> {
             .map_err(|_| Error::ReqestParseError(req.meeting_id.to_string()))?,
     );
 
+    // TODO: reuse client
     reqwest::Client::new()
         .post(format!(
             "{}/token-api/invites/",
