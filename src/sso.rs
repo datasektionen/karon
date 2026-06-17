@@ -58,20 +58,19 @@ pub struct Member {
 
 impl From<SsoMember> for Member {
     fn from(value: SsoMember) -> Self {
-        let email = format!("{}@kth.se", &value.kth_id);
+        let email = format!("{}@kth.se", &value.kthid);
         Member {
-            kth_id: value.kth_id,
+            kth_id: value.kthid,
             email,
-            member_type: value.member_type.as_str().into(),
+            member_type: value.membership.as_str().into(),
         }
     }
 }
 
 #[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct SsoMember {
-    pub kth_id: String,
-    pub member_type: String,
+    pub kthid: String,
+    pub membership: String,
 }
 
 pub async fn get_member_info(card_uid: &str) -> Result<Member, Error> {
