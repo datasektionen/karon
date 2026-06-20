@@ -1,7 +1,10 @@
+//! Functions related directly to SSO and Hive integration.
+
 use std::env;
 
 use crate::{server::Error, voteit::Permissions};
 
+/// The types of memberships a chapter member can have.
 #[derive(Copy, Clone, Debug)]
 pub enum MemberTypes {
     Ordinary,
@@ -45,10 +48,12 @@ impl From<&str> for MemberTypes {
     }
 }
 
+/// Adds a card uid to a member in SSO.
 pub async fn onboard(_card_uid: &str, _kth_id: &str) -> Result<(), Error> {
-    todo!()
+    todo!("Waiting for SSO API.")
 }
 
+/// Representation of a member with the necessary information for Karon.
 #[derive(Debug)]
 pub struct Member {
     pub kth_id: String,
@@ -67,12 +72,14 @@ impl From<SsoMember> for Member {
     }
 }
 
+/// Representation of a member in our membership database.
 #[derive(Debug, serde::Deserialize)]
 struct SsoMember {
     pub kthid: String,
     pub membership: String,
 }
 
+/// Requests [`Member`] information from the chapter's membership database.
 pub async fn get_member_info(card_uid: &str) -> Result<Member, Error> {
     let b: SsoMember = reqwest::Client::new()
         .get(format!(
@@ -87,6 +94,7 @@ pub async fn get_member_info(card_uid: &str) -> Result<Member, Error> {
     Ok(b.into())
 }
 
+/// Checks Hive if a user should be made a VoteIT moderator.
 pub async fn check_moderator(kth_id: &str) -> Result<bool, Error> {
     const VOTEIT_MOD_PERM_ID: &str = "moderator";
 

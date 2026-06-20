@@ -1,3 +1,5 @@
+//! Handles all functions for Karon's API endpoints.
+
 use actix_web::{HttpResponse, http, post, web::Data};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 
@@ -8,6 +10,7 @@ use crate::{
     voteit::{self, Permissions, VoteItRequest},
 };
 
+/// Handles the `/card` API, which is to be used when a user checks in or out from a meeting.
 #[post("/card")]
 pub async fn card_api(
     db: Data<Db>,
@@ -54,6 +57,8 @@ async fn card(
     Ok(())
 }
 
+/// Handles the `/onboard` API, which is to be used when adding a new card uid to a user in the
+/// membership database.
 #[post("/onboard")]
 pub async fn onboard_api(
     db: Data<Db>,
@@ -76,6 +81,9 @@ async fn onboard(req_body: String) -> Result<String, Error> {
     Ok(card_uid.to_string())
 }
 
+/// Handles the `/card/onboard` API, which is to be used when a user checks in or out from a meeting
+/// but does not have a card uid associated with them. First onboards the user, and then updates
+/// their meeting attendance.
 #[post("/card/onboard")]
 pub async fn card_onboard_api(
     db: Data<Db>,

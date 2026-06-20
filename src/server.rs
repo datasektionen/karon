@@ -1,3 +1,5 @@
+//! Functions related to the actual Karon server functions, handling serving and endpoints.
+
 use actix_web::{HttpResponse, ResponseError, http};
 
 use crate::voteit::VoteItRequest;

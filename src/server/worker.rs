@@ -1,9 +1,13 @@
+//! Handles the worker thread which actually sends the [`VoteItRequest`]s and updates the database.
+
 use std::{env, time::Duration};
 
 use actix_web::web::Data;
 use tokio::sync::mpsc::Receiver;
 use tracing_log::log;
 
+/// Sets the max length of the multi-producer-single-consumer queue which all [`VoteItRequest`]s
+/// are added to.
 pub const WORKER_CHANNEL_SIZE: usize = 64;
 
 use crate::{
@@ -12,6 +16,9 @@ use crate::{
     voteit::{self, Permissions, VoteItRequest},
 };
 
+/// Listens to the [`VoteItRequest`]-queue and tries to update both the database and VoteIT with the
+/// requests. If it does not succeed it will retry a couple of times with an exponentially
+/// increasing wait time until it has waited 127 seconds in total, at which point if will fail.
 pub async fn work(db: Data<Db>, mut rx: Receiver<VoteItRequest>) {
     while let Some(mut req) = rx.recv().await {
         let timestamp = chrono::Utc::now();

@@ -1,3 +1,5 @@
+//! Functions related directly to VoteIT integration.
+
 use std::{env, fmt::Display};
 
 use bitflags::{bitflags, bitflags_match};
@@ -8,6 +10,7 @@ use crate::server::Error;
 
 pub type VoteItToken = String;
 
+/// Necessary information for a request to VoteIT.
 pub struct VoteItRequest {
     pub meeting_id: Uuid,
     pub voteit_token: VoteItToken,
@@ -22,6 +25,7 @@ impl Display for VoteItRequest {
 }
 
 bitflags! {
+    /// The types of permissions which exists for users in VoteIT.
     #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
     pub struct Permissions: u8 {
         const PARTICIPANT = 0b00001;
@@ -33,6 +37,7 @@ bitflags! {
 }
 
 impl Permissions {
+    /// Translates the VoteIT permissions to their string representations which VoteIT uses.
     pub fn to_voteit_strings(&self) -> Vec<&'static str> {
         self.iter()
             .filter_map(|b| {
@@ -48,21 +53,25 @@ impl Permissions {
             .collect()
     }
 
+    /// Returns [`Permissions`] with no rightsno rights.
     pub fn no_permissions() -> Self {
         Self::empty()
     }
 
+    /// Checks if a [`Permissions`] has voting rights.
     pub fn has_suffrage(&self) -> bool {
         self.contains(Permissions::VOTER)
     }
 }
 
 impl Default for Permissions {
+    /// Returns [`Permissions`] with only the right to participate in a VoteIT meeting.
     fn default() -> Self {
         Self::PARTICIPANT
     }
 }
 
+/// Updates a persons attendance in VoteIT via the VoteIT `token-api`.
 pub async fn update_attendance(req: &VoteItRequest) -> Result<(), Error> {
     let body = body_builder(&req.email, req.perms);
     let mut headers = reqwest::header::HeaderMap::new();
@@ -86,6 +95,7 @@ pub async fn update_attendance(req: &VoteItRequest) -> Result<(), Error> {
     Ok(())
 }
 
+/// Builds the request body for sending to VoteIT.
 fn body_builder(email: &str, permissions: Permissions) -> Value {
     let permission_strings = permissions.to_voteit_strings();
     json!({

@@ -1,3 +1,5 @@
+//! Functions related directly to the database.
+
 use chrono::{DateTime, Days, NaiveDate, Utc};
 use sqlx::{PgPool, postgres::PgQueryResult, types::Uuid};
 
@@ -8,6 +10,7 @@ pub struct Db {
     pool: PgPool,
 }
 
+/// Representation of a chapter meeting in the database.
 pub struct Meeting {
     pub meeting_id: Uuid,
     pub meeting_name: String,
@@ -28,6 +31,9 @@ impl Db {
     }
 }
 
+/// Creates a meeting with a VoteIT token linked to a certain VoteIT meeting. The token does not
+/// have to be unique. The meeting will by default not be active. This function returns the internal
+/// id of the meeting.
 pub async fn create_meeting(
     db: &Db,
     name: String,
@@ -50,6 +56,7 @@ pub async fn create_meeting(
     Ok(id)
 }
 
+/// Enables a meeting, setting it to active.
 pub async fn enable_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
     sqlx::query!(
         "UPDATE meetings SET active = true WHERE meeting_id = $1",
@@ -59,6 +66,7 @@ pub async fn enable_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Er
     .await
 }
 
+/// Disables a meeting, changing it to inactive.
 pub async fn disable_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
     sqlx::query!(
         "UPDATE meetings SET active = false WHERE meeting_id = $1",
@@ -68,18 +76,21 @@ pub async fn disable_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::E
     .await
 }
 
+/// Removes a meeting from the database.
 pub async fn remove_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
     sqlx::query!("DELETE FROM meetings WHERE meeting_id = $1", id)
         .execute(db.pool())
         .await
 }
 
+/// Gets [`Meeting`] information based on a meeting id.
 pub async fn get_meeting(db: &Db, id: Uuid) -> Result<Meeting, sqlx::Error> {
     sqlx::query_as!(Meeting, "SELECT * FROM meetings WHERE meeting_id=$1", id)
         .fetch_one(db.pool())
         .await
 }
 
+/// Gets [`Meeting`] information based on a `kerberos token`.
 pub async fn get_meeting_from_token(db: &Db, token_str: &str) -> Result<Meeting, Error> {
     let token = Uuid::parse_str(token_str)?;
     sqlx::query_as!(
@@ -92,18 +103,23 @@ pub async fn get_meeting_from_token(db: &Db, token_str: &str) -> Result<Meeting,
     .map_err(|e| e.into())
 }
 
+/// Checks if a given meeting is active, based on the internal meeting id.
 pub async fn is_meeting_active(db: &Db, id: Uuid) -> Result<bool, sqlx::Error> {
     sqlx::query_scalar!("SELECT active FROM meetings WHERE meeting_id=$1", id)
         .fetch_one(db.pool())
         .await
 }
 
+/// The types of actions a member can take at a meeting.
 #[derive(Clone, Copy, Debug)]
 pub enum Action {
     Entered,
     Left,
 }
 
+/// Updates a members attendance at a given meeting, meaning they either [`Action::Left`] the
+/// meeting if they were already present or [`Action::Entered`] if they were currently not in
+/// attendance.
 pub async fn update_attendance(
     db: &Db,
     meeting_id: Uuid,
@@ -147,6 +163,8 @@ pub async fn update_attendance(
     }
 }
 
+/// Verifies is a given `onboard token` is active, meaning it exists and was created less than 48
+/// hours ago.
 pub async fn verify_onboard_token(db: &Db, token_str: &str) -> Result<(), Error> {
     let token = Uuid::parse_str(token_str)?;
     let time = sqlx::query_scalar!(

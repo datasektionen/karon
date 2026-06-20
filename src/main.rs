@@ -4,10 +4,9 @@ use actix_web::{App, HttpServer, middleware, web::Data};
 use sqlx::PgPool;
 use tokio::sync::mpsc;
 use tracing_actix_web::TracingLogger;
-use tracing_log::log;
 
 use crate::{
-    db::{Db, create_meeting, enable_meeting, get_meeting},
+    db::Db,
     server::worker::{self, work},
 };
 
@@ -31,20 +30,6 @@ async fn main() -> std::io::Result<()> {
     let (tx, rx) = mpsc::channel(worker::WORKER_CHANNEL_SIZE);
 
     let db = Data::new(Db::new(pool));
-
-    let meeting_id = create_meeting(
-        &db,
-        "test-SM".to_string(),
-        chrono::Utc::now().date_naive(),
-        "TOKEN".to_string(),
-    )
-    .await
-    .unwrap();
-
-    let meeting = get_meeting(&db, meeting_id).await.unwrap();
-    log::info!("Kerberos token: {}", meeting.kerberos_token);
-
-    enable_meeting(&db, meeting.meeting_id).await.unwrap();
 
     tokio::spawn(work(db.clone(), rx));
 
