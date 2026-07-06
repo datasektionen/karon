@@ -1,0 +1,127 @@
+services:
+  karon:
+    build:
+      dockerfile: Dockerfile.dev
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      TZ: Europe/Stockholm
+      DATABASE_URL: postgresql://karon:karon@db:5432/karon
+      HIVE_API_URL: http://nyckeln:7004/api/v1
+      HIVE_API_KEY: secret
+      SECRET_KEY: secret
+      OIDC_ISSUER_URL: http://localhost:7003
+      OIDC_CLIENT_ID: client-id
+      OIDC_CLIENT_SECRET: client-secret
+      DARKMODE_URL: no
+      RUST_LOG: debug
+      VOTEIT_URL: 0
+    develop:
+      watch:
+        - path: ./src
+          action: rebuild
+        - path: ./templates
+          action: rebuild
+        - path: ./locales
+          action: rebuild
+        - path: ./migrations
+          action: rebuild
+        - path: ./Cargo.*
+          action: rebuild
+        - path: ./static
+          action: sync
+          target: /karon/static
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: docker.io/library/postgres:latest
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - karon-db-data:/data/db
+    environment:
+      POSTGRES_USER: karon
+      POSTGRES_PASSWORD: karon
+      POSTGRES_DB: karon
+      PG_DATA: /data/db
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "karon"]
+      interval: 2s
+      timeout: 2s
+      retries: 3
+  nyckeln:
+    image: ghcr.io/datasektionen/nyckeln-under-dorrmattan
+    configs:
+      - source: nyckeln.yaml
+        target: /config.yaml
+    ports:
+      - 7003:7003
+      - 7004:7004
+
+configs:
+  nginx.conf:
+    content: |
+      events {}
+
+      http {
+        server {
+          listen 7003;
+
+          location / {
+            proxy_pass http://nyckeln:7003;
+          }
+        }
+      }
+
+  nyckeln.yaml:
+    content: |
+      clients:
+        - id: "client-id"
+          secret: "client-secret"
+          redirect_uris:
+            - http://localhost:6767/auth/oidc-callback
+
+      users:
+        - ug_kth_id: some-id
+          kth_id: turetek
+          email: turetek@kth.se
+          first_name: Ture
+          family_name: Teknolog
+          membership: ordinary
+          nfc_id: 0
+        - ug_kth_id: some-id
+          kth_id: karklu
+          email: karklu@kth.se
+          first_name: Karin
+          family_name: Klubbare
+          membership: alumni
+          nfc_id: 0
+        - ug_kth_id: some-id
+          kth_id: diadat
+          email: diadat@kth.se
+          first_name: Diana
+          family_name: Datalog
+          membership: ordinary
+          nfc_id: 0
+
+      hive:
+        tokens:
+        groups:
+          - name: Talman
+            id: talman
+            domain: example.com
+            members:
+              - turetek
+            permissions:
+              - id: moderator
+              - id: karon-admin
+          - name: Drektoratet
+            id: drektoratet
+            permissions:
+              - id: karon-admin
+            members:
+              - karklu
+
+volumes:
+  karon-db-data:
