@@ -68,7 +68,6 @@ pub async fn work(db: Data<Db>, mut rx: Receiver<VoteItRequest>) {
                     sleep_time *= 2;
                     continue;
                 }
-                // TODO: We really should not silently just break when encountering errors.
                 _ => break,
             };
         }
