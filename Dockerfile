@@ -11,8 +11,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=bind,source=./Cargo.lock,target=./Cargo.lock \
     --mount=type=bind,source=./src,target=./src \
     --mount=type=bind,source=./templates,target=./templates \
-    --mount=type=bind,source=./locales,target=./locales \
     --mount=type=bind,source=./migrations,target=./migrations \
+    --mount=type=bind,source=./.sqlx,target=./.sqlx \
     \
     cargo build --locked --release \
     && cp ./target/release/atlas .
@@ -36,7 +36,7 @@ USER ${USER}
 
 WORKDIR /karon
 COPY --from=build /karon/karon .
-COPY ./static /karon/static
+COPY ./client /karon/client
 
 EXPOSE ${KARON_PORT:-8080}
 
