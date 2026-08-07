@@ -10,12 +10,16 @@ services:
       HIVE_API_URL: http://nyckeln:7004/api/v1
       HIVE_API_KEY: secret
       SECRET_KEY: secret
+      SSO_URL: http://nyckeln:7003
       OIDC_ISSUER_URL: http://localhost:7003
       OIDC_CLIENT_ID: client-id
       OIDC_CLIENT_SECRET: client-secret
       DARKMODE_URL: no
       RUST_LOG: debug
       VOTEIT_URL: 0
+    configs:
+        - source: nginx.conf
+          target: /etc/nginx/nginx.conf
     develop:
       watch:
         - path: ./src
