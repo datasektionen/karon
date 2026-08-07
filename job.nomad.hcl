@@ -37,8 +37,8 @@ PORT={{ env "NOMAD_PORT_http" }}
 OIDC_PROVIDER=https://sso.datasektionen.se/op
 SSO_URL=http://sso.nomad.dsekt.internal
 OIDC_ID=karon
-RUST_LOG: info
-TZ: Europe/Stockholm
+RUST_LOG=info
+TZ=Europe/Stockholm
 OIDC_REDIRECT_URL=https://karon.datasektionen.se/oidc/callback
 HIVE_URL=https://hive.datasektionen.se/api/v1
 ENV
