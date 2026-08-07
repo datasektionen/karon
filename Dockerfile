@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=bind,source=./.sqlx,target=./.sqlx \
     \
     cargo build --locked --release \
-    && cp ./target/release/atlas .
+    && cp ./target/release/karon .
 
 ## RUN
 FROM alpine:latest
