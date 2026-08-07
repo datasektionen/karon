@@ -2,6 +2,8 @@
 
 use std::env;
 
+use serde_json::json;
+
 use crate::{server::Error, voteit::Permissions};
 
 /// The types of memberships a chapter member can have.
@@ -49,8 +51,20 @@ impl From<&str> for MemberTypes {
 }
 
 /// Adds a card uid to a member in SSO.
-pub async fn onboard(_card_uid: &str, _kth_id: &str) -> Result<(), Error> {
-    todo!("Waiting for SSO API.")
+pub async fn onboard(card_uid: &str, kth_id: &str) -> Result<(), Error> {
+    reqwest::Client::new()
+        .post(format!(
+            "{}/api/nfc",
+            &env::var("SSO_URL").expect("SSO URL not found.")
+        ))
+        .json(&json!({
+            "kthid": kth_id,
+            "nfc_id": card_uid
+        }))
+        .send()
+        .await?
+        .error_for_status()?;
+    Ok(())
 }
 
 /// Representation of a member with the necessary information for Karon.
@@ -63,7 +77,7 @@ pub struct Member {
 
 impl From<SsoMember> for Member {
     fn from(value: SsoMember) -> Self {
-        let email = format!("{}@kth.se", &value.kthid);
+        let email = format!("{}@kth.se", value.kthid);
         Member {
             kth_id: value.kthid,
             email,
