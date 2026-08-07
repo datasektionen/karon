@@ -16,6 +16,7 @@ services:
       OIDC_CLIENT_SECRET: client-secret
       RUST_LOG: debug
       VOTEIT_URL: 0
+      PORT: 8080
     configs:
         - source: nginx.conf
           target: /etc/nginx/nginx.conf

@@ -33,6 +33,11 @@ async fn main() -> std::io::Result<()> {
 
     tokio::spawn(work(db.clone(), rx));
 
+    let port = env::var("PORT")
+        .expect("PORT not found.")
+        .parse::<u16>()
+        .unwrap();
+
     HttpServer::new(move || {
         App::new()
             .app_data(db.clone())
@@ -43,7 +48,7 @@ async fn main() -> std::io::Result<()> {
             .service(server::api::onboard_api)
             .service(server::api::card_onboard_api)
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind(("0.0.0.0", port))?
     .run()
     .await
 }
