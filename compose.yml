@@ -14,7 +14,6 @@ services:
       OIDC_ISSUER_URL: http://localhost:7003
       OIDC_CLIENT_ID: client-id
       OIDC_CLIENT_SECRET: client-secret
-      DARKMODE_URL: no
       RUST_LOG: debug
       VOTEIT_URL: 0
     configs:
