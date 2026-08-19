@@ -25,7 +25,7 @@ pub async fn card_api(
     db: Data<Db>,
     tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest)>>,
     event_stream: Data<async_channel::Sender<(Either<String, Uuid>, Event)>>,
-    form: web::Form<CardData>,
+    req_body: String,
     token: Either<BearerAuth, Session>,
 ) -> Result<HttpResponse, Error> {
     let (user, meeting) = match token {
@@ -44,7 +44,7 @@ pub async fn card_api(
         }
     };
 
-    let member_info = match sso::get_member_info(&form.card_uid).await {
+    let member_info = match sso::get_member_info(&req_body).await {
         Ok(member_info) => member_info,
         Err(error) => {
             match error {
