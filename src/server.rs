@@ -1,8 +1,10 @@
 //! Functions related to the actual Karon server functions, handling serving and endpoints.
 
-use actix_web::{HttpResponse, ResponseError, http};
+use actix_web::{Either, HttpResponse, ResponseError, http};
+use reqwest::StatusCode;
+use uuid::Uuid;
 
-use crate::voteit::VoteItRequest;
+use crate::{server::Error::VoteItRequestFail, sso::Member, voteit::VoteItRequest};
 
 pub mod api;
 pub mod worker;
@@ -26,9 +28,13 @@ pub enum Error {
     #[error("failed to send VoteIT request to VoteIT: {0}")]
     VoteItRequestFail(#[from] reqwest::Error),
     #[error("VoteIT request queue full")]
-    RequestQueueFull(#[from] tokio::sync::mpsc::error::SendError<VoteItRequest>),
+    RequestQueueFull(
+        #[from] tokio::sync::mpsc::error::SendError<(Either<String, Uuid>, Member, VoteItRequest)>,
+    ),
     #[error("Person is not a member and has no permissions")]
     NonMember,
+    #[error("This session is not connected to a meeting")]
+    NotConnectedToMeeting,
 }
 
 impl ResponseError for Error {

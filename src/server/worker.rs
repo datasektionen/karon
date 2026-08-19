@@ -2,25 +2,28 @@
 
 use std::{env, time::Duration};
 
-use actix_web::web::Data;
+use actix_web::{Either, web::Data};
 use tokio::sync::mpsc::Receiver;
 use tracing_log::log;
+use uuid::Uuid;
 
 /// Sets the max length of the multi-producer-single-consumer queue which all [`VoteItRequest`]s
 /// are added to.
 pub const WORKER_CHANNEL_SIZE: usize = 64;
 
 use crate::{
-    db::{self, Action, Db},
-    server::Error,
-    voteit::{self, Permissions, VoteItRequest},
+    client::Event, db::{self, Action, Db}, server::Error, sso::Member, voteit::{self, Permissions, VoteItRequest}
 };
 
 /// Listens to the [`VoteItRequest`]-queue and tries to update both the database and VoteIT with the
 /// requests. If it does not succeed it will retry a couple of times with an exponentially
 /// increasing wait time until it has waited 127 seconds in total, at which point if will fail.
-pub async fn work(db: Data<Db>, mut rx: Receiver<VoteItRequest>) {
-    while let Some(mut req) = rx.recv().await {
+pub async fn work(
+    db: Data<Db>,
+    mut rx: Receiver<(Either<String, Uuid>, Member, VoteItRequest)>,
+    event_stream: async_channel::Sender<(Either<String, Uuid>, Event)>,
+) {
+    while let Some((user, member, mut req)) = rx.recv().await {
         let timestamp = chrono::Utc::now();
         let action = db::update_attendance(
             &db,
@@ -33,9 +36,31 @@ pub async fn work(db: Data<Db>, mut rx: Receiver<VoteItRequest>) {
         .expect("Could not connect to database");
 
         match action {
-            Action::Entered => (),
+            Action::Entered => {
+                let _ = event_stream
+                    .send((
+                        user,
+                        Event::Joined {
+                            name: member.name,
+                            picture: member.picture,
+                            member_type: member.member_type,
+                        },
+                    ))
+                    .await
+                    .unwrap();
+            }
             Action::Left => {
                 req.perms &= Permissions::default() | Permissions::MODERATOR;
+                let _ = event_stream
+                    .send((
+                        user,
+                        Event::Left {
+                            name: member.name,
+                            picture: member.picture,
+                        },
+                    ))
+                    .await
+                    .unwrap();
             }
         };
 

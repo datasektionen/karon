@@ -6,14 +6,16 @@ services:
       - "127.0.0.1:8080:8080"
     environment:
       TZ: Europe/Stockholm
+      APP_SECRET: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       DATABASE_URL: postgresql://karon:karon@db:5432/karon
       HIVE_API_URL: http://nyckeln:7004/api/v1
       HIVE_API_KEY: secret
       SECRET_KEY: secret
       SSO_URL: http://nyckeln:7003
-      OIDC_ISSUER_URL: http://localhost:7003
+      OIDC_PROVIDER: http://localhost:7003
       OIDC_CLIENT_ID: client-id
       OIDC_CLIENT_SECRET: client-secret
+      OIDC_REDIRECT_URL: http://localhost:8080/auth/callback
       RUST_LOG: debug
       VOTEIT_URL: 0
       PORT: 8080
@@ -84,7 +86,7 @@ configs:
         - id: "client-id"
           secret: "client-secret"
           redirect_uris:
-            - http://localhost:6767/auth/oidc-callback
+            - http://localhost:8080/auth/callback
 
       users:
         - ug_kth_id: some-id
@@ -94,6 +96,7 @@ configs:
           family_name: Teknolog
           membership: ordinary
           nfc_id: 0
+          picture: https://thskth.se/wp-content/uploads/2023/06/ths-logo-bla-01-300x294-1.png
         - ug_kth_id: some-id
           kth_id: karklu
           email: karklu@kth.se
