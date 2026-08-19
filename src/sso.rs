@@ -1,7 +1,8 @@
 //! Functions related directly to SSO and Hive integration.
 
-use std::env;
+use std::{env, fmt};
 
+use reqwest::StatusCode;
 use serde_json::json;
 
 use crate::{server::Error, voteit::Permissions};
@@ -15,6 +16,19 @@ pub enum MemberTypes {
     Junior,
     Honorary,
     NonMember,
+}
+
+impl fmt::Display for MemberTypes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ordinary => write!(f, "Ordinary"),
+            Self::Alumni => write!(f, "Alumni"),
+            Self::Guest => write!(f, "Guest"),
+            Self::Junior => write!(f, "Junior"),
+            Self::Honorary => write!(f, "Honorary"),
+            Self::NonMember => write!(f, "NonMember"),
+        }
+    }
 }
 
 impl From<MemberTypes> for Permissions {
@@ -68,11 +82,13 @@ pub async fn onboard(card_uid: &str, kth_id: &str) -> Result<(), Error> {
 }
 
 /// Representation of a member with the necessary information for Karon.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Member {
     pub kth_id: String,
+    pub name: String,
     pub email: String,
     pub member_type: MemberTypes,
+    pub picture: String,
 }
 
 impl From<SsoMember> for Member {
@@ -80,16 +96,22 @@ impl From<SsoMember> for Member {
         let email = format!("{}@kth.se", value.kthid);
         Member {
             kth_id: value.kthid,
+            name: format!("{} {}", value.first_name, value.family_name),
             email,
             member_type: value.membership.as_str().into(),
+            picture: value.picture,
         }
     }
 }
 
 /// Representation of a member in our membership database.
 #[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct SsoMember {
     pub kthid: String,
+    pub first_name: String,
+    pub family_name: String,
+    pub picture: String,
     pub membership: String,
 }
 
@@ -97,11 +119,21 @@ struct SsoMember {
 pub async fn get_member_info(card_uid: &str) -> Result<Member, Error> {
     let b: SsoMember = reqwest::Client::new()
         .get(format!(
-            "{}/api/users?format=single&u={card_uid}",
+            "{}/api/users?format=single&picture=full&u={card_uid}",
             &env::var("SSO_URL").expect("SSO URL not found.")
         ))
         .send()
         .await?
+        .error_for_status()
+        .map_err(|error| {
+            if let Some(status) = error.status()
+                && status == StatusCode::NOT_FOUND
+            {
+                Error::CardNotExisting(String::from(card_uid))
+            } else {
+                error.into()
+            }
+        })?
         .json()
         .await?;
 

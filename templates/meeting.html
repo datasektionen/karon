@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<form hx-post="/init/meeting">
+    <label for="name">Meeting Name</label>
+    <input type="text" name="name" />
+    <label for="name">Meeting Date</label>
+    <input type="date" name="date" />
+    <input type="text" name="voteit-token" value="{{voteit_token}}" hidden />
+    <input type="submit" value="Submit" />
+</form>
+{% endblock content %}

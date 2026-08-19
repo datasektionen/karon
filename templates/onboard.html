@@ -1,0 +1,9 @@
+<div>
+    <h2>The card is not connected to a user</h2>
+    <form hx-post="/card/onboard">
+        <label for="kth_id">KTHID</label>
+        <input type="text" name="kth-id" />
+        <input name="card-uid" value="{{card_uid}}" hidden />
+        <input type="submit" value="Onboand" />
+    </form>
+</div>

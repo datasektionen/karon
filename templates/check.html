@@ -1,0 +1,45 @@
+<header>
+    <div id="voteit">
+        <p>Meeting ID: {{meeting.meeting_id}}</p>
+        {% if meeting.active %}
+        <div id="active">
+            <p>Meeting is active</p>
+            <button hx-post="/meeting/inactive" hx-target="#active">Deactivate Meeting</button>
+        </div>
+        {% else %}
+        <div id="active">
+            <p>Meeting is inactive</p>
+            <button hx-post="/meeting/active" hx-target="#active">Activate Meeting</button>
+        </div>
+        {% endif %}
+    </div>
+    {% match scanner %}
+        {% when Scanner::Kerberos(token) %}<p>Kerberos token: {{token}}</p>
+        {% when Scanner::NFC %}<p>Scanning using on-device NFC</p>
+    {% endmatch %}
+</header>
+<main class="container">
+    <article hx-ext="sse" sse-connect="/events" sse-swap="event">
+        <div></div>
+    </article>
+</main>
+<script>
+const ndefReader = new NDEFReader();
+
+scan()
+
+async function scan() {
+    await ndefReader.scan();
+
+    ndefReader.onreading = async ({ message, serialNumber }) => {
+        // We use the serialNumber from the reader
+        // Note: serialNumber availability can be experimental in some browsers
+        // If serialNumber is not available, we'd need to parse an NDEF record
+
+        const response = await fetch("/card", {
+          method: "POST",
+          body: serialNumber.toUpperCase()
+        });
+    };
+}
+</script>

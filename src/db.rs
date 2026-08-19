@@ -1,5 +1,9 @@
 //! Functions related directly to the database.
 
+use core::fmt;
+use std::fmt::write;
+
+use actix_session::Session;
 use chrono::{DateTime, Days, NaiveDate, Utc};
 use sqlx::{PgPool, postgres::PgQueryResult, types::Uuid};
 
@@ -90,6 +94,13 @@ pub async fn get_meeting(db: &Db, id: Uuid) -> Result<Meeting, sqlx::Error> {
         .await
 }
 
+/// Gets [`Meeting`] information based on a `voteit token`.
+pub async fn get_meeting_from_votit_token(db: &Db, id: &str) -> Result<Meeting, sqlx::Error> {
+    sqlx::query_as!(Meeting, "SELECT * FROM meetings WHERE voteit_token=$1", id)
+        .fetch_one(db.pool())
+        .await
+}
+
 /// Gets [`Meeting`] information based on a `kerberos token`.
 pub async fn get_meeting_from_token(db: &Db, token_str: &str) -> Result<Meeting, Error> {
     let token = Uuid::parse_str(token_str)?;
@@ -115,6 +126,15 @@ pub async fn is_meeting_active(db: &Db, id: Uuid) -> Result<bool, sqlx::Error> {
 pub enum Action {
     Entered,
     Left,
+}
+
+impl fmt::Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Entered => write!(f, "Entered"),
+            Self::Left => write!(f, "Left"),
+        }
+    }
 }
 
 /// Updates a members attendance at a given meeting, meaning they either [`Action::Left`] the

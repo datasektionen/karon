@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block content %}
+<form hx-post="/join/meeting">
+    <label for="voteit-token">VoteIT token</label>
+    <input type="text" name="voteit-token" />
+    <input type="submit" value="Submit" />
+</form>
+{% endblock content %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<button 
+    class="outline"
+    hx-post="/init/kerberos"
+    hx-target="body"
+>
+    Kerberos
+</button>
+<button 
+    id="init-nfc"
+    class="outline"
+    hx-post="/init/nfc"
+    hx-target="body"
+>
+    NFC
+</button>
+<script>
+    const button = document.getElementById("init-nfc");
+
+    if (!("NDEFReader" in window)) {
+        button.classList.toggle('cursor-not-allowed');
+        button.classList.toggle('opacity-50');
+        button.disabled = true;
+        button.innerText = "NFC only supported in Chrome on Android"
+    }
+</script>
+{% endblock content %}
