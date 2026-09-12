@@ -1,20 +1,16 @@
 use std::env;
 
 use openidconnect::{
-    Client, ClientId, ClientSecret, EmptyAdditionalClaims, EmptyExtraTokenFields, EndpointMaybeSet,
-    EndpointNotSet, EndpointSet, IdTokenFields, IssuerUrl, RedirectUrl,
-    RevocationErrorResponseType, StandardErrorResponse, StandardTokenIntrospectionResponse,
-    StandardTokenResponse,
-    core::{
+    AdditionalClaims, Client, ClientId, ClientSecret, EmptyAdditionalClaims, EmptyExtraTokenFields, EndpointMaybeSet, EndpointNotSet, EndpointSet, IdTokenFields, IssuerUrl, RedirectUrl, RevocationErrorResponseType, StandardErrorResponse, StandardTokenIntrospectionResponse, StandardTokenResponse, core::{
         CoreAuthDisplay, CoreAuthPrompt, CoreErrorResponseType, CoreGenderClaim, CoreJsonWebKey,
         CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm, CoreProviderMetadata,
         CoreRevocableToken, CoreTokenType,
-    },
-    reqwest,
+    }, reqwest
 };
+use serde::{Deserialize, Serialize};
 
 pub type OIDCClientType = openidconnect::Client<
-    EmptyAdditionalClaims,
+    SSOAdditionalClaims,
     CoreAuthDisplay,
     CoreGenderClaim,
     CoreJweContentEncryptionAlgorithm,
@@ -35,7 +31,7 @@ pub type OIDCClientType = openidconnect::Client<
 
 pub type AuthTokenResponse = StandardTokenResponse<
     IdTokenFields<
-        EmptyAdditionalClaims,
+        SSOAdditionalClaims,
         EmptyExtraTokenFields,
         CoreGenderClaim,
         CoreJweContentEncryptionAlgorithm,
@@ -43,6 +39,19 @@ pub type AuthTokenResponse = StandardTokenResponse<
     >,
     CoreTokenType,
 >;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HivePermission {
+    pub id: String,
+    pub scope: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SSOAdditionalClaims {
+    pub permissions: Vec<HivePermission>
+}
+
+impl AdditionalClaims for SSOAdditionalClaims {}
 
 #[derive(Clone)]
 pub struct OIDCClient {

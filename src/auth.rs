@@ -9,11 +9,12 @@ use actix_web::{
 };
 use jsonwebtoken::DecodingKey;
 use openidconnect::{
-    AccessTokenHash, AuthorizationCode, CsrfToken, Nonce, OAuth2TokenResponse, TokenResponse,
-    core::CoreAuthenticationFlow,
+    AccessTokenHash, AuthorizationCode, CsrfToken, Nonce, OAuth2TokenResponse, Scope,
+    TokenResponse, core::CoreAuthenticationFlow,
 };
 use std::{future::Future, pin::Pin};
 use thiserror::Error;
+use tracing_log::log;
 
 use jsonwebtoken::EncodingKey;
 use serde::Deserialize;
@@ -21,7 +22,7 @@ use std::future::{Ready, ready};
 
 use crate::{
     cookies::{CookieError, LoginContext},
-    oidc::OIDCClient,
+    oidc::{HivePermission, OIDCClient},
 };
 
 #[derive(Deserialize)]
@@ -60,10 +61,13 @@ enum AuthError {
     InvalidCSRFToken,
     #[error("{0}")]
     CookieError(#[from] CookieError),
+    #[error("user has insufficient permissions")]
+    InsufficientPermissions,
 }
 
 impl ResponseError for AuthError {
     fn error_response(&self) -> HttpResponse<actix_web::body::BoxBody> {
+        log::error!("{}", self);
         HttpResponse::build(self.status_code()).body(self.to_string())
     }
 
@@ -80,6 +84,7 @@ impl ResponseError for AuthError {
             Self::InvalidCSRFToken => StatusCode::UNAUTHORIZED,
             Self::SessionInsertError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::CookieError(_) => StatusCode::UNAUTHORIZED,
+            Self::InsufficientPermissions => StatusCode::UNAUTHORIZED,
         }
     }
 }
@@ -128,6 +133,15 @@ pub async fn callback(
         return Err(AuthError::OidcInvalidTokenHash(
             claims.subject().to_string(),
         ));
+    }
+
+    if !claims
+        .additional_claims()
+        .permissions
+        .iter()
+        .any(|perm| perm.id == "karon-admin")
+    {
+        return Err(AuthError::InsufficientPermissions.into());
     }
 
     session.insert("kthid", claims.subject().to_string())?;
@@ -202,9 +216,10 @@ where
                     CsrfToken::new_random,
                     Nonce::new_random,
                 )
+                .add_scope(Scope::new(String::from("permissions")))
                 .url();
 
-            let token = LoginContext::new(String::from("rfinger"), csrf_token, nonce);
+            let token = LoginContext::new(String::from("karon"), csrf_token, nonce);
             let cookie = token.cookie(&self.encoding_key).unwrap();
 
             let response = HttpResponse::TemporaryRedirect()
