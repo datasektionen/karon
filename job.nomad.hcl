@@ -29,18 +29,19 @@ job "karon" {
         data        = <<ENV
 {{ with nomadVar "nomad/jobs/karon" }}
 APP_SECRET={{ .app_secret }}
-OIDC_SECRET={{ .oidc_secret }}
-HIVE_TOKEN={{ .hive_api_key }}
+OIDC_CLIENT_SECRET={{ .oidc_secret }}
+HIVE_API_KEY={{ .hive_api_key }}
 DATABASE_URL=postgresql://karon:{{ .database_password }}@postgres.dsekt.internal:5432/karon
 {{ end }}
 PORT={{ env "NOMAD_PORT_http" }}
 OIDC_PROVIDER=https://sso.datasektionen.se/op
+OIDC_CLIENT_ID=karon
+OIDC_REDIRECT_URL=https://karon.datasektionen.se/auth/callback
 SSO_URL=http://sso.nomad.dsekt.internal
-OIDC_ID=karon
-RUST_LOG=info
-TZ=Europe/Stockholm
-OIDC_REDIRECT_URL=https://karon.datasektionen.se/oidc/callback
 HIVE_URL=https://hive.datasektionen.se/api/v1
+VOTEIT_URL=https://ths.voteit.se
+TZ=Europe/Stockholm
+RUST_LOG=info
 ENV
         destination = "local/.env"
         env         = true
