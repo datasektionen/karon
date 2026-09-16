@@ -1,3 +1,6 @@
+{% extends "base.html" %}
+
+{% block content %}
 <header>
     <div id="voteit">
         <p>Meeting ID: {{meeting.meeting_id}}</p>
@@ -43,3 +46,4 @@ async function scan() {
     };
 }
 </script>
+{% endblock content %}
