@@ -2,6 +2,7 @@
 
 use actix_web::{Either, HttpResponse, ResponseError, http};
 use reqwest::StatusCode;
+use tracing_log::log;
 use uuid::Uuid;
 
 use crate::{server::Error::VoteItRequestFail, sso::Member, voteit::VoteItRequest};
@@ -39,6 +40,7 @@ pub enum Error {
 
 impl ResponseError for Error {
     fn status_code(&self) -> actix_web::http::StatusCode {
+        log::error!("{self}");
         actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
     }
 
