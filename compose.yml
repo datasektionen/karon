@@ -3,7 +3,7 @@ services:
     build:
       dockerfile: Dockerfile.dev
     ports:
-      - "127.0.0.1:8080:8080"
+      - "8080:8080"
     environment:
       TZ: Europe/Stockholm
       APP_SECRET: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -16,8 +16,8 @@ services:
       OIDC_CLIENT_ID: client-id
       OIDC_CLIENT_SECRET: client-secret
       OIDC_REDIRECT_URL: http://localhost:8080/auth/callback
-      RUST_LOG: debug
-      VOTEIT_URL: 0
+      RUST_LOG: info,karon=debug,actix-ws=trace
+      VOTEIT_URL: http://voteit:5000
       PORT: 8080
     configs:
         - source: nginx.conf
@@ -65,6 +65,12 @@ services:
       - 7003:7003
       - 7004:7004
 
+  voteit:
+    build:
+      dockerfile: Dockerfile.voteit
+    ports:
+      - 5000:5000
+
 configs:
   nginx.conf:
     content: |
@@ -104,6 +110,7 @@ configs:
           family_name: Klubbare
           membership: alumni
           nfc_id: 0
+          picture: https://thskth.se/wp-content/uploads/2023/06/ths-logo-bla-01-300x294-1.png
         - ug_kth_id: some-id
           kth_id: diadat
           email: diadat@kth.se
@@ -111,6 +118,14 @@ configs:
           family_name: Datalog
           membership: ordinary
           nfc_id: 0
+          picture: https://thskth.se/wp-content/uploads/2023/06/ths-logo-bla-01-300x294-1.png
+        - ug_kth_id: some-id
+          kth_id: marmed
+          first_name: Martin
+          family_name: Median
+          membership: none
+          nfc_id: 0
+          picture: https://thskth.se/wp-content/uploads/2023/06/ths-logo-bla-01-300x294-1.png
 
       hive:
         tokens:
@@ -120,6 +135,7 @@ configs:
             domain: example.com
             members:
               - turetek
+              - viktoe
             permissions:
               - id: moderator
               - id: karon-admin
