@@ -54,7 +54,7 @@ async fn main() -> std::io::Result<()> {
     let oidc_client = web::Data::new(OIDCClient::new().await.unwrap());
 
     let (worker_tx, worker_rx) = mpsc::channel(worker::WORKER_CHANNEL_SIZE);
-    let (event_stream_tx, event_stream_rx) = async_channel::unbounded();
+    let (event_stream_tx, event_stream_rx) = async_broadcast::broadcast(64);
 
     tokio::spawn(work(db.clone(), worker_rx, event_stream_tx.clone()));
 
@@ -95,13 +95,17 @@ async fn main() -> std::io::Result<()> {
                         oidc_client.clone(),
                         encoding_key.clone(),
                     ))
-                    .service(client::index)
-                    .service(client::init_kerberos)
-                    .service(client::init_nfc)
-                    .service(client::init_meeting)
-                    .service(client::join_meeting)
+                    .service(client::admin_view)
+                    .service(client::meeting_view)
+                    .service(client::create_meeting)
                     .service(client::activate_meeting)
                     .service(client::deactivate_meeting)
+                    .service(client::onboard_nfc_view)
+                    .service(client::onboard_nfc)
+                    .service(client::onboard_kerberos)
+                    .service(client::scan_nfc)
+                    .service(client::meeting_attendance)
+                    .service(client::scan_kerberos)
                     .service(client::events),
             )
     })

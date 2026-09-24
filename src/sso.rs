@@ -7,6 +7,15 @@ use serde_json::json;
 
 use crate::{server::Error, voteit::Permissions};
 
+pub trait Populate<T>
+where
+    Self: Sized,
+{
+    type Error;
+
+    async fn populate(self) -> Result<Vec<T>, Self::Error>;
+}
+
 /// The types of memberships a chapter member can have.
 #[derive(Copy, Clone, Debug)]
 pub enum MemberTypes {

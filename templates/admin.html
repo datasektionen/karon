@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Karon</h1>
+<div class="grid">
+    <article>
+        <header>
+            <h2>Onboard</h2>
+        </header>
+        <div class="grid">
+            <section>
+                <h3>Kerberos</h3>
+                <a href="/onboard/kerberos"><button>Generate token</button></a>
+            </section>
+            <section>
+                <h3>NFC</h3>
+                <a class="nfc-link" href="/onboard/nfc"><button class="nfc-button">Start scanning</button></a>
+            </section>
+        </div>
+    </article>
+    <article>
+        <header class="grid">
+            <h2>Meetings</h2>
+            <a href="/meeting"><button>New Meeting</button></a>
+        </header>
+        <table class="striped">
+            <tbody>
+                {% for meeting in meetings %}
+                    {% include "meeting_entry.html" %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </article>
+</div>
+<script>
+    function checkNFC() {
+        if (!("NDEFReader" in window)) {
+            document.querySelectorAll('.nfc-button').forEach(el => {el.classList.add('cursor-not-allowed'); el.classList.add('opacity-50'); el.disabled = true;});
+            document.querySelectorAll('.nfc-link').forEach(el => {el.style.pointerEvents = 'none'; el.removeAttribute('href');});
+        }
+    }
+
+    checkNFC();
+
+    document.body.addEventListener('htmx:afterSwap', (event) => {
+        checkNFC();
+      }
+    );
+
+</script>
+{% endblock content %}

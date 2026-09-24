@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Meeting</h1>
+{% match scanner %}
+    {% when Scanner::Kerberos(token) %}<p>Kerberos token: {{token}}</p>
+    {% when Scanner::NFC %}<p>Scanning using on-device NFC</p>
+{% endmatch %}
+<article id="onboard"></article>
+<div class="grid" hx-ext="ws" ws-connect="/events">
+    <article>
+        <h2>Last Scanned</h2>
+        <div id="current"></div>
+    </article>
+    <article>
+        <header>
+            <h2>Attendence List</h2>
+        </header>
+        <div class="overflow-auto">
+            <table class="striped">
+                <thead>
+                    <th>Name</th>
+                    <th>Entered</th>
+                    <th>Left</th>
+                    <th>Suffrage</th>
+                </thead>
+                {% include "attendance.html" %}
+            </table>
+        </div>
+    </article>
+</div>
+<script>
+const ndefReader = new NDEFReader();
+
+scan()
+
+async function scan() {
+    await ndefReader.scan();
+
+    ndefReader.onreading = async ({ message, serialNumber }) => {
+        // We use the serialNumber from the reader
+        // Note: serialNumber availability can be experimental in some browsers
+        // If serialNumber is not available, we'd need to parse an NDEF record
+
+        // 1. Define your form data
+        const formData = new URLSearchParams();
+        formData.append('card-uid', serialNumber.toUpperCase());
+
+        const response = await fetch("/card", {
+          method: "POST",
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formData
+        });
+
+        let attendance = document.getElementById("attendance-list");
+
+        htmx.trigger(attendance, 'change')
+    };
+}
+</script>
+{% endblock content %}
+
+

@@ -1,11 +1,16 @@
 use std::env;
 
 use openidconnect::{
-    AdditionalClaims, Client, ClientId, ClientSecret, EmptyAdditionalClaims, EmptyExtraTokenFields, EndpointMaybeSet, EndpointNotSet, EndpointSet, IdTokenFields, IssuerUrl, RedirectUrl, RevocationErrorResponseType, StandardErrorResponse, StandardTokenIntrospectionResponse, StandardTokenResponse, core::{
+    AdditionalClaims, Client, ClientId, ClientSecret, EmptyExtraTokenFields,
+    EndpointMaybeSet, EndpointNotSet, EndpointSet, IdTokenFields, IssuerUrl, RedirectUrl,
+    RevocationErrorResponseType, StandardErrorResponse, StandardTokenIntrospectionResponse,
+    StandardTokenResponse,
+    core::{
         CoreAuthDisplay, CoreAuthPrompt, CoreErrorResponseType, CoreGenderClaim, CoreJsonWebKey,
         CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm, CoreProviderMetadata,
         CoreRevocableToken, CoreTokenType,
-    }, reqwest
+    },
+    reqwest,
 };
 use serde::{Deserialize, Serialize};
 
@@ -48,7 +53,7 @@ pub struct HivePermission {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SSOAdditionalClaims {
-    pub permissions: Vec<HivePermission>
+    pub permissions: Vec<HivePermission>,
 }
 
 impl AdditionalClaims for SSOAdditionalClaims {}
