@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE meetings SET active = true WHERE meeting_id = $1 RETURNING *",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "meeting_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "meeting_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "meeting_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "voteit_token",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "kerberos_token",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f49de110624cd6ffb9fabd9943c57ec7a6648cce244867bf4db9ad585e36b187"
+}

@@ -20,8 +20,6 @@ pub enum CookieError {
     JwtEncodingError(#[source] jsonwebtoken::errors::Error),
     #[error("failed to decode jwt: {0}")]
     JwtDecodingError(#[source] jsonwebtoken::errors::Error),
-    #[error("failed to get session cookie")]
-    MissingSessionCookie,
     #[error("trying to finish auth flow but missing context")]
     MissingLoginContext,
 }

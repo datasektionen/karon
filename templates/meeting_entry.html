@@ -1,0 +1,14 @@
+<tr>
+    <td>{{ meeting.meeting_name }}</td>
+    {% if meeting.active %}
+        <td>
+            <a href="/scan/kerberos/{{meeting.meeting_id}}"><button>Kerberos</button></a>
+            <a class="nfc-link" href="/scan/nfc/{{meeting.meeting_id}}"><button class="nfc-button">NFC</button></a>
+            <input checked type="checkbox" role="switch" hx-patch="/meeting/deactivate/{{meeting.meeting_id}}" hx-target="closest tr" hx-swap="outerHTML" />
+        </td>
+    {% else %}
+        <td>
+            <input type="checkbox" role="switch" hx-patch="/meeting/activate/{{meeting.meeting_id}}" hx-target="closest tr" hx-swap="outerHTML" />
+        </td>
+    {% endif %}
+</tr>

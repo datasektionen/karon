@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM meetings ORDER BY meeting_date, meeting_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "meeting_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "meeting_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "meeting_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "voteit_token",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "kerberos_token",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "112d28dd8b7b928ca280b660eb011fe0723e2109f63e5ad7069cb8907ae1e869"
+}

@@ -2,17 +2,23 @@
 
 use std::{env, time::Duration};
 
-use actix_web::{Either, web::Data};
+use actix_web::web::Data;
 use tokio::sync::mpsc::Receiver;
 use tracing_log::log;
 use uuid::Uuid;
+
+use either::Either;
 
 /// Sets the max length of the multi-producer-single-consumer queue which all [`VoteItRequest`]s
 /// are added to.
 pub const WORKER_CHANNEL_SIZE: usize = 64;
 
 use crate::{
-    client::Event, db::{self, Action, Db}, server::Error, sso::Member, voteit::{self, Permissions, VoteItRequest}
+    client::Event,
+    db::{self, Action, Db},
+    server::Error,
+    sso::Member,
+    voteit::{self, Permissions, VoteItRequest},
 };
 
 /// Listens to the [`VoteItRequest`]-queue and tries to update both the database and VoteIT with the
@@ -21,14 +27,14 @@ use crate::{
 pub async fn work(
     db: Data<Db>,
     mut rx: Receiver<(Either<String, Uuid>, Member, VoteItRequest)>,
-    event_stream: async_channel::Sender<(Either<String, Uuid>, Event)>,
+    event_stream: async_broadcast::Sender<(Either<String, Uuid>, Event)>,
 ) {
     while let Some((user, member, mut req)) = rx.recv().await {
         let timestamp = chrono::Utc::now();
         let action = db::update_attendance(
             &db,
             req.meeting_id,
-            &req.email,
+            &member.kth_id,
             timestamp,
             req.perms.has_suffrage(),
         )
@@ -38,7 +44,7 @@ pub async fn work(
         match action {
             Action::Entered => {
                 let _ = event_stream
-                    .send((
+                    .broadcast((
                         user,
                         Event::Joined {
                             name: member.name,
@@ -52,7 +58,7 @@ pub async fn work(
             Action::Left => {
                 req.perms &= Permissions::default() | Permissions::MODERATOR;
                 let _ = event_stream
-                    .send((
+                    .broadcast((
                         user,
                         Event::Left {
                             name: member.name,

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO onboard_tokens VALUES (DEFAULT, DEFAULT) RETURNING kerberos_token",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kerberos_token",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "efb90790dd9ffd4b0a7887076edef496b333f9ce9ad170d8c4177a9840eeef75"
+}

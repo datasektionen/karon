@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH updated AS (\n            UPDATE attendances\n            SET left_at = $1\n            WHERE meeting_id = $2 AND kthid = $3 AND left_at IS NULL\n            RETURNING 'left' AS action\n        ),\n        inserted AS (\n            INSERT INTO attendances (meeting_id, kthid, entered_at, suffrage)\n            SELECT $2, $3, $1, $4\n            WHERE NOT EXISTS (SELECT 1 FROM updated)\n            RETURNING 'entered' AS action\n        )\n        SELECT action FROM updated\n        UNION ALL\n        SELECT action FROM inserted;\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "action",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Uuid",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "cd36f43c202159cd7ecca6872148d0a1ff7fb3d900288f71fc5bb13d39b3aa34"
+}

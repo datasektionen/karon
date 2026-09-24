@@ -1,0 +1,10 @@
+<tbody 
+    id="attendance-list" 
+    hx-get="/meeting/{{meeting_id}}/attendance" 
+    hx-trigger="change" 
+    hx-swap="outerHTML"
+>
+    {% for attendee in attendance %}
+        {% include "attendee.html" %}
+    {% endfor %}
+</tbody>

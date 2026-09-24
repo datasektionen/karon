@@ -1,9 +1,7 @@
 //! Functions related directly to the database.
 
 use core::fmt;
-use std::fmt::write;
 
-use actix_session::Session;
 use chrono::{DateTime, Days, NaiveDate, Utc};
 use sqlx::{PgPool, postgres::PgQueryResult, types::Uuid};
 
@@ -25,6 +23,14 @@ pub struct Meeting {
     pub kerberos_token: Uuid,
 }
 
+/// Represents a persons single continous presece at a meeting
+pub struct Attendance {
+    pub kthid: String,
+    pub entered_at: DateTime<Utc>,
+    pub left_at: Option<DateTime<Utc>>,
+    pub suffrage: bool,
+}
+
 impl Db {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
@@ -40,9 +46,9 @@ impl Db {
 /// id of the meeting.
 pub async fn create_meeting(
     db: &Db,
-    name: String,
-    date: NaiveDate,
-    voteit_token: String,
+    name: &str,
+    date: &NaiveDate,
+    voteit_token: &str,
 ) -> Result<Uuid, sqlx::Error> {
     let id = sqlx::query_scalar!(
         r"
@@ -61,22 +67,24 @@ pub async fn create_meeting(
 }
 
 /// Enables a meeting, setting it to active.
-pub async fn enable_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
-    sqlx::query!(
-        "UPDATE meetings SET active = true WHERE meeting_id = $1",
+pub async fn enable_meeting(db: &Db, id: &Uuid) -> Result<Meeting, sqlx::Error> {
+    sqlx::query_as!(
+        Meeting,
+        "UPDATE meetings SET active = true WHERE meeting_id = $1 RETURNING *",
         id
     )
-    .execute(db.pool())
+    .fetch_one(db.pool())
     .await
 }
 
 /// Disables a meeting, changing it to inactive.
-pub async fn disable_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
-    sqlx::query!(
-        "UPDATE meetings SET active = false WHERE meeting_id = $1",
+pub async fn disable_meeting(db: &Db, id: &Uuid) -> Result<Meeting, sqlx::Error> {
+    sqlx::query_as!(
+        Meeting,
+        "UPDATE meetings SET active = false WHERE meeting_id = $1 RETURNING *",
         id
     )
-    .execute(db.pool())
+    .fetch_one(db.pool())
     .await
 }
 
@@ -87,16 +95,19 @@ pub async fn remove_meeting(db: &Db, id: Uuid) -> Result<PgQueryResult, sqlx::Er
         .await
 }
 
+/// Gets [`Meeting`] information for all meetings
+pub async fn list_meetings(db: &Db) -> Result<Vec<Meeting>, sqlx::Error> {
+    sqlx::query_as!(
+        Meeting,
+        "SELECT * FROM meetings ORDER BY meeting_date, meeting_id"
+    )
+    .fetch_all(db.pool())
+    .await
+}
+
 /// Gets [`Meeting`] information based on a meeting id.
 pub async fn get_meeting(db: &Db, id: Uuid) -> Result<Meeting, sqlx::Error> {
     sqlx::query_as!(Meeting, "SELECT * FROM meetings WHERE meeting_id=$1", id)
-        .fetch_one(db.pool())
-        .await
-}
-
-/// Gets [`Meeting`] information based on a `voteit token`.
-pub async fn get_meeting_from_votit_token(db: &Db, id: &str) -> Result<Meeting, sqlx::Error> {
-    sqlx::query_as!(Meeting, "SELECT * FROM meetings WHERE voteit_token=$1", id)
         .fetch_one(db.pool())
         .await
 }
@@ -137,13 +148,27 @@ impl fmt::Display for Action {
     }
 }
 
+/// Lists all attendances for a given meeting orderd by the time they entered
+pub async fn list_attendance_for_meeting(
+    db: &Db,
+    meeting_id: &Uuid,
+) -> Result<Vec<Attendance>, sqlx::Error> {
+    sqlx::query_as!(
+        Attendance,
+        "SELECT kthid, entered_at, left_at, suffrage FROM attendances WHERE meeting_id = $1 ORDER BY entered_at",
+        meeting_id
+    )
+    .fetch_all(db.pool())
+    .await
+}
+
 /// Updates a members attendance at a given meeting, meaning they either [`Action::Left`] the
 /// meeting if they were already present or [`Action::Entered`] if they were currently not in
 /// attendance.
 pub async fn update_attendance(
     db: &Db,
     meeting_id: Uuid,
-    email: &str,
+    kthid: &str,
     timestamp: DateTime<Utc>,
     suffrage: bool,
 ) -> Result<Action, sqlx::Error> {
@@ -152,11 +177,11 @@ pub async fn update_attendance(
         WITH updated AS (
             UPDATE attendances
             SET left_at = $1
-            WHERE meeting_id = $2 AND email = $3 AND left_at IS NULL
+            WHERE meeting_id = $2 AND kthid = $3 AND left_at IS NULL
             RETURNING 'left' AS action
         ),
         inserted AS (
-            INSERT INTO attendances (meeting_id, email, entered_at, suffrage)
+            INSERT INTO attendances (meeting_id, kthid, entered_at, suffrage)
             SELECT $2, $3, $1, $4
             WHERE NOT EXISTS (SELECT 1 FROM updated)
             RETURNING 'entered' AS action
@@ -167,7 +192,7 @@ pub async fn update_attendance(
         "#,
         timestamp,
         meeting_id,
-        email,
+        kthid,
         suffrage
     )
     .fetch_one(db.pool())
@@ -181,6 +206,14 @@ pub async fn update_attendance(
         "left" => Ok(Action::Left),
         _ => Ok(Action::Entered),
     }
+}
+
+pub async fn create_onboard_token(db: &Db) -> Result<Uuid, sqlx::Error> {
+    sqlx::query_scalar!(
+        "INSERT INTO onboard_tokens VALUES (DEFAULT, DEFAULT) RETURNING kerberos_token"
+    )
+    .fetch_one(db.pool())
+    .await
 }
 
 /// Verifies is a given `onboard token` is active, meaning it exists and was created less than 48

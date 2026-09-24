@@ -1,9 +1,35 @@
-<div>
-    <h2>The card is not connected to a user</h2>
-    <form hx-post="/card/onboard">
-        <label for="kth_id">KTHID</label>
-        <input type="text" name="kth-id" />
-        <input name="card-uid" value="{{card_uid}}" hidden />
-        <input type="submit" value="Onboand" />
-    </form>
-</div>
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Onboard</h1>
+{% match scanner %}
+    {% when Scanner::Kerberos(token) %}<p>Kerberos token: {{token}}</p>
+    {% when Scanner::NFC %}
+        <form method="post" action="/onboard/nfc">
+            <label for="card-uid">Card UID</label>
+            <input id="card" name="card-uid" />
+            <label for="kth-id">KTH ID</label>
+            <input name="kth-id" />
+            <input type="submit" value="Submit" />
+        </form>
+{% endmatch %}
+<script>
+const ndefReader = new NDEFReader();
+
+let field = document.getElementById("card");
+
+scan()
+
+async function scan() {
+    await ndefReader.scan();
+
+    ndefReader.onreading = async ({ message, serialNumber }) => {
+        // We use the serialNumber from the reader
+        // Note: serialNumber availability can be experimental in some browsers
+        // If serialNumber is not available, we'd need to parse an NDEF record
+
+        field.value = serialNumber.toUpperCase();
+    };
+}
+</script>
+{% endblock content %}

@@ -1,0 +1,10 @@
+<article id="onboard" hx-swap-oop="true">
+    <form hx-post="/card/onboard" hx-swap="delete" target="self">
+        <input name="card-uid" value="{{card_uid}}" hidden />
+        <label for="kth-id">Enter kthid:</label>
+        <fieldset role="group">
+            <input name="kth-id" />
+            <input type="submit" value="Onboard" />
+        </fieldset>
+    </form>
+</article>

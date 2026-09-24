@@ -21,8 +21,7 @@ use serde::Deserialize;
 use std::future::{Ready, ready};
 
 use crate::{
-    cookies::{CookieError, LoginContext},
-    oidc::{HivePermission, OIDCClient},
+    client::KTH_ID, cookies::{CookieError, LoginContext}, oidc::OIDCClient,
 };
 
 #[derive(Deserialize)]
@@ -144,7 +143,7 @@ pub async fn callback(
         return Err(AuthError::InsufficientPermissions.into());
     }
 
-    session.insert("kthid", claims.subject().to_string())?;
+    session.insert(KTH_ID, claims.subject().to_string())?;
 
     Ok(HttpResponse::TemporaryRedirect()
         .insert_header(("location", "/"))
@@ -205,7 +204,7 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let session = req.get_session();
-        let kthid = if let Some(kthid) = session.get::<String>("kthid").unwrap() {
+        let kthid = if let Some(kthid) = session.get::<String>(KTH_ID).unwrap() {
             kthid
         } else {
             let (auth_url, csrf_token, nonce) = self
