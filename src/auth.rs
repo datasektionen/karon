@@ -21,7 +21,9 @@ use serde::Deserialize;
 use std::future::{Ready, ready};
 
 use crate::{
-    client::KTH_ID, cookies::{CookieError, LoginContext}, oidc::OIDCClient,
+    client::KTH_ID,
+    cookies::{CookieError, LoginContext},
+    oidc::OIDCClient,
 };
 
 #[derive(Deserialize)]

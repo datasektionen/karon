@@ -1,8 +1,8 @@
 use std::env;
 
 use openidconnect::{
-    AdditionalClaims, Client, ClientId, ClientSecret, EmptyExtraTokenFields,
-    EndpointMaybeSet, EndpointNotSet, EndpointSet, IdTokenFields, IssuerUrl, RedirectUrl,
+    AdditionalClaims, Client, ClientId, ClientSecret, EmptyExtraTokenFields, EndpointMaybeSet,
+    EndpointNotSet, EndpointSet, IdTokenFields, IssuerUrl, RedirectUrl,
     RevocationErrorResponseType, StandardErrorResponse, StandardTokenIntrospectionResponse,
     StandardTokenResponse,
     core::{
