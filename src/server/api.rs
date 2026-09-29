@@ -5,13 +5,17 @@ use actix_web::{
     HttpResponse, http, post,
     web::{self, Data},
 };
-use either::Either;
 use actix_web_httpauth::extractors::bearer::BearerAuth;
+use either::Either;
 use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
-    client::{Event, KTH_ID, MEETING_ID}, db::{self, Db, Meeting}, server::Error, sso::{self, Member, check_moderator}, voteit::{self, Permissions, VoteItRequest},
+    client::{Event, KTH_ID, MEETING_ID},
+    db::{self, Db, Meeting},
+    server::Error,
+    sso::{self, Member, check_moderator},
+    voteit::{self, Permissions, VoteItRequest},
 };
 
 #[derive(Deserialize)]
@@ -36,15 +40,11 @@ pub async fn card_api(
         ),
         actix_web::Either::Right(session) => {
             let kthid = session.get(KTH_ID).unwrap().unwrap();
-            let Some(meeting_id) = session.get(MEETING_ID).map_err(|_| Error::TokenExpired)?
-            else {
+            let Some(meeting_id) = session.get(MEETING_ID).map_err(|_| Error::TokenExpired)? else {
                 return Err(Error::NotConnectedToMeeting);
             };
 
-            (
-                Either::Left(kthid),
-                db::get_meeting(&db, meeting_id).await?,
-            )
+            (Either::Left(kthid), db::get_meeting(&db, meeting_id).await?)
         }
     };
 
@@ -52,7 +52,9 @@ pub async fn card_api(
         Ok(member_info) => member_info,
         Err(error) => {
             match error {
-                Error::CardNotExisting(ref card_uid) if matches!(token, actix_web::Either::Right(_)) => {
+                Error::CardNotExisting(ref card_uid)
+                    if matches!(token, actix_web::Either::Right(_)) =>
+                {
                     let _ = event_stream
                         .broadcast((
                             user,
@@ -172,15 +174,11 @@ pub async fn card_onboard_api(
         ),
         actix_web::Either::Right(session) => {
             let kthid = session.get(KTH_ID).unwrap().unwrap();
-            let Some(meeting_id) = session.get(MEETING_ID).map_err(|_| Error::TokenExpired)?
-            else {
+            let Some(meeting_id) = session.get(MEETING_ID).map_err(|_| Error::TokenExpired)? else {
                 return Err(Error::NotConnectedToMeeting);
             };
 
-            (
-                Either::Left(kthid),
-                db::get_meeting(&db, meeting_id).await?,
-            )
+            (Either::Left(kthid), db::get_meeting(&db, meeting_id).await?)
         }
     };
 

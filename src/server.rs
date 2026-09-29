@@ -30,8 +30,7 @@ pub enum Error {
     VoteItRequestFail(#[from] reqwest::Error),
     #[error("VoteIT request queue full")]
     RequestQueueFull(
-        #[from]
-        tokio::sync::mpsc::error::SendError<(Either<String, Uuid>, Member, VoteItRequest)>,
+        #[from] tokio::sync::mpsc::error::SendError<(Either<String, Uuid>, Member, VoteItRequest)>,
     ),
     #[error("Person is not a member and has no permissions")]
     NonMember,
