@@ -128,7 +128,7 @@ struct SsoMember {
 pub async fn get_member_info(card_uid: &str) -> Result<Member, Error> {
     let b: SsoMember = reqwest::Client::new()
         .get(format!(
-            "{}/api/users?format=single&picture=full&u={card_uid}",
+            "{}/api/users?format=single&picture=thumbnail&u={card_uid}",
             &env::var("SSO_URL").expect("SSO URL not found.")
         ))
         .send()
