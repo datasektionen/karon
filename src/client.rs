@@ -16,8 +16,12 @@ use tracing_log::log;
 
 use crate::{
     db::{self, Attendance, Db, Meeting},
-    server::{self, api::OnboardData},
-    sso::{self, MemberTypes, Populate, onboard},
+    server::{
+        self,
+        api::{OnboardData, card},
+    },
+    sso::{self, Member, MemberTypes, Populate, onboard},
+    voteit::VoteItRequest,
 };
 
 pub const KTH_ID: &str = "kth-id";
@@ -219,9 +223,31 @@ pub async fn activate_meeting(
 
 #[patch("/meeting/deactivate/{id}")]
 pub async fn deactivate_meeting(
+    tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest)>>,
+    event_stream: Data<async_broadcast::Sender<(Either<String, Uuid>, Event)>>,
     db: Data<Db>,
     id: web::Path<Uuid>,
+    session: Session,
 ) -> Result<HttpResponse, ClientError> {
+    let meeting = db::get_meeting(&db, *id).await?;
+    let present = db::list_present_at_meeting(&db, &*id).await?;
+    let user = session
+        .get::<String>(KTH_ID)?
+        .ok_or(ClientError::SessionDataError(KTH_ID.to_string()))?;
+
+    for attendee in present {
+        let member_info = sso::get_member_info(&attendee.kthid).await?;
+
+        card(
+            tx.clone(),
+            event_stream.clone(),
+            Either::Left(user.clone()),
+            member_info,
+            meeting.clone(),
+        )
+        .await?;
+    }
+
     let meeting = db::disable_meeting(&db, &id).await?;
 
     let template = MeetingEntryPartial { meeting };

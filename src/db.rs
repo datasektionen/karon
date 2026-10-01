@@ -13,6 +13,7 @@ pub struct Db {
 }
 
 /// Representation of a chapter meeting in the database.
+#[derive(Clone)]
 pub struct Meeting {
     pub meeting_id: Uuid,
     pub meeting_name: String,
@@ -78,7 +79,10 @@ pub async fn enable_meeting(db: &Db, id: &Uuid) -> Result<Meeting, sqlx::Error> 
 }
 
 /// Disables a meeting, changing it to inactive.
-pub async fn disable_meeting(db: &Db, id: &Uuid) -> Result<Meeting, sqlx::Error> {
+pub async fn disable_meeting(
+    db: &Db,
+    id: &Uuid,
+) -> Result<Meeting, sqlx::Error> {
     sqlx::query_as!(
         Meeting,
         "UPDATE meetings SET active = false WHERE meeting_id = $1 RETURNING *",
@@ -156,6 +160,19 @@ pub async fn list_attendance_for_meeting(
     sqlx::query_as!(
         Attendance,
         "SELECT kthid, entered_at, left_at, suffrage FROM attendances WHERE meeting_id = $1 ORDER BY entered_at",
+        meeting_id
+    )
+    .fetch_all(db.pool())
+    .await
+}
+
+pub async fn list_present_at_meeting(
+    db: &Db,
+    meeting_id: &Uuid,
+) -> Result<Vec<Attendance>, sqlx::Error> {
+    sqlx::query_as!(
+        Attendance,
+        "SELECT kthid, entered_at, left_at, suffrage FROM attendances WHERE meeting_id = $1 AND left_at IS NULL ORDER BY entered_at",
         meeting_id
     )
     .fetch_all(db.pool())
