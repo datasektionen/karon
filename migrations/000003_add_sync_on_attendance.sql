@@ -1,0 +1,1 @@
+ALTER TABLE attendances ADD COLUMN synced_voteit BOOL NOT NULL DEFAULT FALSE;

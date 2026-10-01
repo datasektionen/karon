@@ -90,7 +90,8 @@ pub async fn update_attendance(req: &VoteItRequest) -> Result<(), Error> {
         .headers(headers)
         .json(&body)
         .send()
-        .await?;
+        .await?
+        .error_for_status()?;
 
     Ok(())
 }

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT kthid, CASE WHEN left_at IS NULL THEN 'left' ELSE 'entered' END as \"action!\" FROM attendances WHERE meeting_id = $1 AND synced_voteit = false",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kthid",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "action!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "d9045f029a2c95de73b16d4d3b2011cdb69f4408f329881db58514543dfbc852"
+}
