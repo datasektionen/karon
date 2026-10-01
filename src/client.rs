@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use actix_session::Session;
 use actix_web::{
     HttpRequest, HttpResponse, Responder, ResponseError, get,
@@ -8,9 +10,11 @@ use actix_web::{
 use askama::Template;
 use chrono::{DateTime, Local, NaiveDate, Utc};
 use either::Either;
+use metrics::{counter, gauge};
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 use thiserror::Error;
+use tokio::time::Instant;
 use tokio_stream::StreamExt;
 use tracing_log::log;
 
@@ -359,73 +363,112 @@ pub async fn events(
 
     let mut events = rx.get_ref().clone();
 
+    let mut interval = tokio::time::interval(Duration::from_secs(6));
+
     let (res, mut session, mut ws_stream) = actix_ws::handle(&req, stream)?;
     rt::spawn(async move {
+        struct WsGuard;
+        impl Drop for WsGuard {
+            fn drop(&mut self) {
+                gauge!("karon.ws.count").decrement(1);
+            }
+        }
+
+        // Track connection health
+        let mut last_pong = Instant::now();
+        gauge!("karon.ws.count").increment(1);
+        let _guard = WsGuard; // Guarantees decrement on break/return/panic
+
+        use actix_ws::Message;
         loop {
             tokio::select! {
-                None = ws_stream.next() => break,
+                _ = interval.tick() => {
+                    // Heartbeat check
+                    if Instant::now().duration_since(last_pong) > Duration::from_secs(30) {
+                        log::info!("ws session timed out");
+                        let _ = session.close(None).await;
+                        break;
+                    }
 
-                Ok((id, event)) = events.recv() => {
-                    // Filter the event stream
-                    match id {
-                        Either::Left(id) => {
-                            if id != kthid {
-                                continue;
-                            }
+                    if let Err(e) = session.ping(b"ping").await {
+                        log::info!("ws ping failed: {}", e);
+                        break;
+                    }
+                },
+
+                msg = ws_stream.next() => {
+                    match msg {
+                        Some(Ok(Message::Pong(_))) => {
+                            last_pong = Instant::now();
                         }
+                        Some(Ok(Message::Ping(bytes))) => {
+                            let _ = session.pong(&bytes).await;
+                        }
+                        Some(Ok(Message::Text(_))) => {
+                            // Process client input if expected
+                        }
+                        Some(Ok(Message::Close(reason))) => {
+                            log::info!("ws session closed: {:?}", reason);
+                            break;
+                        }
+                        Some(Err(e)) => {
+                            log::info!("ws stream error: {}", e);
+                            break;
+                        }
+                        None => {
+                            log::info!("ws stream ended");
+                            break;
+                        }
+                        _ => {}
+                    }
+                },
+
+                res = events.recv() => {
+                    let Ok((id, event)) = res else {
+                        log::info!("events channel closed");
+                        break;
+                    };
+
+                    // Event filtering
+                    match id {
+                        Either::Left(id) if id != kthid => continue,
                         Either::Right(token) => match scanner {
-                            Scanner::Kerberos(kb_token) => {
-                                if token != kb_token {
-                                    continue;
-                                }
-                            }
+                            Scanner::Kerberos(kb_token) if token != kb_token => continue,
                             Scanner::NFC => continue,
+                            _ => {}
                         },
+                        _ => {}
                     }
 
                     let data = match event {
-                        Event::Joined {
-                            name,
-                            picture,
-                            member_type,
-                        } => {
-                            let template = ActionPartial {
+                        Event::Joined { name, picture, member_type } => {
+                            ActionPartial {
                                 picture,
                                 name,
                                 action: format!("Joined the meeting as {member_type} member"),
-                            };
-
-                            template.render().expect("template without runtime funcions should not be able to fail")
+                            }.render().expect("template render failed")
                         }
                         Event::Left { name, picture } => {
-                            let template = ActionPartial {
+                            ActionPartial {
                                 picture,
                                 name,
                                 action: String::from("Left the meeting"),
-                            };
-
-                            template.render().expect("template without runtime funcions should not be able to fail")
+                            }.render().expect("template render failed")
                         }
                         Event::Onboard { card_uid } => {
-                            let template = OnboardPartial { card_uid };
-
-                            template.render().expect("template without runtime funcions should not be able to fail")
-                        },
+                            OnboardPartial { card_uid }.render().expect("template render failed")
+                        }
                         Event::NonMember { name, picture } => {
-                            let template = NonMemberPartial {
-                                picture,
-                                name,
-                            };
-
-                            template.render().expect("template without runtime funcions should not be able to fail")
+                            NonMemberPartial { picture, name }.render().expect("template render failed")
                         }
                     };
 
-                    // If it fails to send -> ws client is closed -> ws server will close on next
-                    // loop iteration
-                    let _ = session.text(data).await.inspect_err(|e| log::error!("{}", e));
+                    if let Err(e) = session.text(data).await {
+                        log::error!("ws session send err: {}", e);
+                        break;
+                    }
                 }
-            };
+            }
         }
     });
 

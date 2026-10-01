@@ -11,6 +11,7 @@ job "karon" {
       port     = "http"
       provider = "nomad"
       tags = [
+        "prometheus.scrape=true",
         "traefik.enable=true",
         "traefik.http.routers.karon.rule=Host(`karon.datasektionen.se`)",
         "traefik.http.routers.karon.tls.certresolver=default",

@@ -3,6 +3,7 @@
 use std::{env, time::Duration};
 
 use actix_web::web::Data;
+use metrics::gauge;
 use tokio::sync::mpsc::Receiver;
 use tracing_log::log;
 use uuid::Uuid;
@@ -30,6 +31,7 @@ pub async fn work(
     event_stream: async_broadcast::Sender<(Either<String, Uuid>, Event)>,
 ) {
     while let Some((user, member, mut req)) = rx.recv().await {
+        gauge!("karon.worker.queue").set(rx.len() as f64);
         let timestamp = chrono::Utc::now();
         let action = db::update_attendance(
             &db,
