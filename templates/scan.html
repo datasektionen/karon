@@ -6,7 +6,13 @@
     {% when Scanner::Kerberos(token) %}<p>Kerberos token: {{token}}</p>
     {% when Scanner::NFC %}<p>Scanning using on-device NFC</p>
 {% endmatch %}
-<article id="onboard"></article>
+<div id="onboard"></div>
+<div id="voteit-fail">
+    {% for attendee in desynced_attendance %}
+        {% include "voteit_failed.html" %}
+    {% endfor %}
+</div>
+
 <div class="grid" hx-ext="ws" ws-connect="/events">
     <article>
         <h2>Last Scanned</h2>

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE attendances SET synced_voteit = true WHERE kthid = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "515a7f5ff67d049998a9e4dc01d4e3f2cd367c21b2d64e1846483481c3b06128"
+}

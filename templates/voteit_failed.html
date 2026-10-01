@@ -1,0 +1,6 @@
+<article hx-swap-oop="beforeend:#voteit-fail">
+    <form hx-post="/voteit/retry/{{attendee.kthid}}/{{attendee.action | lower}}" hx-swap="delete" target="self" style="display: grid; grid-template-columns: 4fr 1fr; align-items: center">
+        <p>Failed to sync {{attendee.name}} to VoteIT</p>
+        <input type="submit" value="retry" />
+    </form>
+</article>

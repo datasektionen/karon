@@ -27,49 +27,56 @@ use crate::{
 /// increasing wait time until it has waited 127 seconds in total, at which point if will fail.
 pub async fn work(
     db: Data<Db>,
-    mut rx: Receiver<(Either<String, Uuid>, Member, VoteItRequest)>,
+    mut rx: Receiver<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>,
     event_stream: async_broadcast::Sender<(Either<String, Uuid>, Event)>,
 ) {
-    while let Some((user, member, mut req)) = rx.recv().await {
+    while let Some((user, member, mut req, retry_action)) = rx.recv().await {
         gauge!("karon.worker.queue").set(rx.len() as f64);
         let timestamp = chrono::Utc::now();
-        let action = db::update_attendance(
-            &db,
-            req.meeting_id,
-            &member.kth_id,
-            timestamp,
-            req.perms.has_suffrage(),
-        )
-        .await
-        .expect("Could not connect to database");
 
-        match action {
-            Action::Entered => {
-                let _ = event_stream
-                    .broadcast((
-                        user,
-                        Event::Joined {
-                            name: member.name,
-                            picture: member.picture,
-                            member_type: member.member_type,
-                        },
-                    ))
-                    .await
-                    .unwrap();
-            }
-            Action::Left => {
-                req.perms &= Permissions::default() | Permissions::MODERATOR;
-                let _ = event_stream
-                    .broadcast((
-                        user,
-                        Event::Left {
-                            name: member.name,
-                            picture: member.picture,
-                        },
-                    ))
-                    .await
-                    .unwrap();
-            }
+        let action = if let Some(action) = retry_action {
+            action
+        } else {
+            let action = db::update_attendance(
+                &db,
+                req.meeting_id,
+                &member.kth_id,
+                timestamp,
+                req.perms.has_suffrage(),
+            )
+            .await
+            .expect("Could not connect to database");
+
+            match action {
+                Action::Entered => {
+                    let _ = event_stream
+                        .broadcast((
+                            user.clone(),
+                            Event::Joined {
+                                name: member.name.clone(),
+                                picture: member.picture,
+                                member_type: member.member_type,
+                            },
+                        ))
+                        .await
+                        .unwrap();
+                }
+                Action::Left => {
+                    req.perms &= Permissions::default() | Permissions::MODERATOR;
+                    let _ = event_stream
+                        .broadcast((
+                            user.clone(),
+                            Event::Left {
+                                name: member.name.clone(),
+                                picture: member.picture,
+                            },
+                        ))
+                        .await
+                        .unwrap();
+                }
+            };
+
+            action
         };
 
         let mut sleep_time = 1;
@@ -78,9 +85,14 @@ pub async fn work(
             match voteit::update_attendance(&req).await {
                 Ok(_) => {
                     match action {
-                        Action::Entered => log::info!("{} has entered meeting", &req.email),
-                        Action::Left => log::info!("{} has left meeting", &req.email),
+                        Action::Entered => log::info!("{} has entered meeting", &member.kth_id),
+                        Action::Left => log::info!("{} has left meeting", &member.kth_id),
                     };
+
+                    let _ = db::set_attendance_synced(&db, &member.kth_id)
+                        .await
+                        .expect("Could not connect to database");
+
                     break;
                 }
 
@@ -90,7 +102,19 @@ pub async fn work(
                             "Unable to send requests to VoteIT ({}) for 127 seconds. Dropping packet {req} at {timestamp}.",
                             &env::var("VOTEIT_URL").expect("VoteIT url not found"),
                         );
-                        // TODO: Should we try to reverse the database entry?
+
+                        let _ = event_stream
+                            .broadcast((
+                                user,
+                                Event::VoteITFailed {
+                                    kthid: member.kth_id,
+                                    name: member.name,
+                                    action,
+                                },
+                            ))
+                            .await
+                            .unwrap();
+
                         break;
                     }
 

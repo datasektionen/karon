@@ -8,7 +8,7 @@ use actix_web::{
     web::{self, Data, Form, Redirect},
 };
 use askama::Template;
-use chrono::{DateTime, Local, NaiveDate, Utc};
+use chrono::{DateTime, Local, NaiveDate};
 use either::Either;
 use metrics::{counter, gauge};
 use serde::{Deserialize, Serialize};
@@ -19,9 +19,10 @@ use tokio_stream::StreamExt;
 use tracing_log::log;
 
 use crate::{
-    db::{self, Attendance, Db, Meeting},
+    db::{self, Action, Attendance, Db, FailedSync, Meeting},
     server::{self, api::OnboardData},
-    sso::{self, MemberTypes, Populate, onboard},
+    sso::{self, Member, MemberTypes, Populate, onboard},
+    voteit::VoteItRequest,
 };
 
 pub const KTH_ID: &str = "kth-id";
@@ -46,6 +47,11 @@ pub enum Event {
     NonMember {
         picture: String,
         name: String,
+    },
+    VoteITFailed {
+        kthid: String,
+        name: String,
+        action: Action,
     },
 }
 
@@ -111,6 +117,32 @@ impl Populate<MeetingAttendance> for Vec<Attendance> {
     }
 }
 
+struct PopulateFailedVoteIT {
+    name: String,
+    kthid: String,
+    action: Action,
+}
+
+impl Populate<PopulateFailedVoteIT> for Vec<FailedSync> {
+    type Error = ClientError;
+
+    async fn populate(self) -> Result<Vec<PopulateFailedVoteIT>, Self::Error> {
+        let mut desynced_attendance = Vec::with_capacity(self.len());
+
+        for FailedSync { kthid, action } in self {
+            let member = sso::get_member_info(&kthid).await?;
+            let value = PopulateFailedVoteIT {
+                name: member.name,
+                kthid: member.kth_id,
+                action,
+            };
+            desynced_attendance.push(value);
+        }
+
+        Ok(desynced_attendance)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum Scanner {
     Kerberos(Uuid),
@@ -145,6 +177,7 @@ struct ScanView {
     meeting_id: Uuid,
     scanner: Scanner,
     attendance: Vec<MeetingAttendance>,
+    desynced_attendance: Vec<PopulateFailedVoteIT>,
 }
 
 #[derive(Template)]
@@ -173,6 +206,12 @@ struct ActionPartial {
 struct NonMemberPartial {
     picture: String,
     name: String,
+}
+
+#[derive(Template)]
+#[template(path = "voteit_failed.html")]
+struct VoteITFailed {
+    attendee: PopulateFailedVoteIT,
 }
 
 #[get("/")]
@@ -292,6 +331,11 @@ pub async fn scan_nfc(
         .populate()
         .await?;
 
+    let desynced_attendance = db::list_unsynced_attendace(&db, *meeting_id)
+        .await?
+        .populate()
+        .await?;
+
     session.insert(MEETING_ID, *meeting_id)?;
     session.insert(SCANNER, Scanner::NFC)?;
 
@@ -299,6 +343,7 @@ pub async fn scan_nfc(
         meeting_id: *meeting_id,
         scanner: Scanner::NFC,
         attendance,
+        desynced_attendance,
     };
 
     Ok(HttpResponse::Ok().body(template.render()?))
@@ -335,6 +380,11 @@ pub async fn scan_kerberos(
         .populate()
         .await?;
 
+    let desynced_attendance = db::list_unsynced_attendace(&db, *meeting_id)
+        .await?
+        .populate()
+        .await?;
+
     session.insert(MEETING_ID, *meeting_id)?;
     session.insert(SCANNER, Scanner::Kerberos(meeting.kerberos_token))?;
 
@@ -342,9 +392,44 @@ pub async fn scan_kerberos(
         meeting_id: *meeting_id,
         scanner: Scanner::Kerberos(meeting.kerberos_token),
         attendance,
+        desynced_attendance,
     };
 
     Ok(HttpResponse::Ok().body(template.render()?))
+}
+
+#[post("/voteit/retry/{kthid}/{action}")]
+pub async fn retry_voteit(
+    db: Data<Db>,
+    path: web::Path<(String, Action)>,
+    tx: Data<
+        tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>,
+    >,
+    session: Session,
+) -> Result<HttpResponse, ClientError> {
+    let (kthid, action) = path.as_ref();
+
+    let user = session.get(KTH_ID).unwrap().unwrap();
+    let meeting_id = session.get(MEETING_ID).unwrap().unwrap();
+
+    let meeting = db::get_meeting(&db, meeting_id).await?;
+
+    let member_info = sso::get_member_info(&kthid).await?;
+
+    let perms = member_info.member_type.into();
+
+    let req = VoteItRequest {
+        meeting_id: meeting.meeting_id,
+        email: member_info.email.clone(),
+        perms,
+        voteit_token: meeting.voteit_token,
+    };
+
+    tx.send((Either::Left(user), member_info, req, Some(*action)))
+        .await
+        .unwrap();
+
+    Ok(HttpResponse::Ok().body("<article id=\"voteit-fail\" style=\"display: none\"></article>"))
 }
 
 #[get("/events")]
@@ -460,6 +545,15 @@ pub async fn events(
                         }
                         Event::NonMember { name, picture } => {
                             NonMemberPartial { picture, name }.render().expect("template render failed")
+                        }
+                        Event::VoteITFailed { kthid, name, action } => {
+                            let attendee = PopulateFailedVoteIT {name, kthid, action};
+
+                            let template = VoteITFailed {
+                                attendee
+                            };
+
+                            template.render().expect("template without runtime funcions should not be able to fail")
                         }
                     };
 
