@@ -72,17 +72,15 @@ async fn main() -> std::io::Result<()> {
         .parse::<u16>()
         .unwrap();
 
-    let prometheus = PrometheusBuilder::new()
+    PrometheusBuilder::new()
         .with_http_listener(([0, 0, 0, 0], metrics_port))
-        .install_recorder()
+        .install()
         .expect("Failed to install Prometheus recorder");
     let metrics = ActixWebMetricsBuilder::new().build();
 
     HttpServer::new(move || {
         App::new()
             .wrap(metrics.clone())
-            .app_data(web::Data::new(prometheus.clone()))
-            .service(get_metrics)
             .wrap(
                 SessionMiddleware::builder(
                     CookieSessionStore::default(),
@@ -130,11 +128,4 @@ async fn main() -> std::io::Result<()> {
     .bind(("0.0.0.0", port))?
     .run()
     .await
-}
-
-#[get("/metrics")]
-async fn get_metrics(prometheus: web::Data<PrometheusHandle>) -> actix_web::HttpResponse {
-    actix_web::HttpResponse::Ok()
-        .content_type(ContentType::plaintext())
-        .body(prometheus.render())
 }

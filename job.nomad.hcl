@@ -12,7 +12,6 @@ job "karon" {
       port     = "http"
       provider = "nomad"
       tags = [
-        "prometheus.scrape=true",
         "traefik.enable=true",
         "traefik.http.routers.karon.rule=Host(`karon.datasektionen.se`)",
         "traefik.http.routers.karon.tls.certresolver=default",
@@ -24,6 +23,7 @@ job "karon" {
           port     = "metrics"
           provider = "nomad"
           tags = [
+            "prometheus.scrape=true",
             "traefik.enable=true",
             "traefik.http.routers.sso-internal.rule=Host(`karon.nomad.dsekt.internal`)",
             "traefik.http.routers.sso-internal.entrypoints=web-internal",
