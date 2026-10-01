@@ -67,7 +67,13 @@ async fn main() -> std::io::Result<()> {
         .parse::<u16>()
         .unwrap();
 
+    let metrics_port = env::var("METRICS_PORT")
+        .expect("METRICS_PORT not found.")
+        .parse::<u16>()
+        .unwrap();
+
     let prometheus = PrometheusBuilder::new()
+        .with_http_listener(([0, 0, 0, 0], metrics_port))
         .install_recorder()
         .expect("Failed to install Prometheus recorder");
     let metrics = ActixWebMetricsBuilder::new().build();

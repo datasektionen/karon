@@ -4,6 +4,7 @@ job "karon" {
   group "karon" {
     network {
       port "http" { }
+      port "metrics" { }
     }
 
     service {
@@ -18,12 +19,23 @@ job "karon" {
       ]
     }
 
+    service {
+          name     = "karon-internal"
+          port     = "metrics"
+          provider = "nomad"
+          tags = [
+            "traefik.enable=true",
+            "traefik.http.routers.sso-internal.rule=Host(`karon.nomad.dsekt.internal`)",
+            "traefik.http.routers.sso-internal.entrypoints=web-internal",
+          ]
+        }
+
     task "karon" {
       driver = "docker"
 
       config {
         image = var.image_tag
-        ports = ["http"]
+        ports = ["http", "metrics"]
       }
 
       template {
@@ -35,6 +47,7 @@ HIVE_API_KEY={{ .hive_api_key }}
 DATABASE_URL=postgresql://karon:{{ .database_password }}@postgres.dsekt.internal:5432/karon
 {{ end }}
 PORT={{ env "NOMAD_PORT_http" }}
+METRICS_PORT={{ env "NOMAD_PORT_metrics" }}
 OIDC_PROVIDER=https://sso.datasektionen.se/op
 OIDC_CLIENT_ID=karon
 OIDC_REDIRECT_URL=https://karon.datasektionen.se/auth/callback
