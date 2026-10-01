@@ -122,7 +122,8 @@ async fn main() -> std::io::Result<()> {
                     .service(client::scan_nfc)
                     .service(client::meeting_attendance)
                     .service(client::scan_kerberos)
-                    .service(client::events),
+                    .service(client::events)
+                    .service(client::retry_voteit)
             )
     })
     .bind(("0.0.0.0", port))?

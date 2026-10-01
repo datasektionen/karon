@@ -5,7 +5,7 @@ use either::Either;
 use tracing_log::log;
 use uuid::Uuid;
 
-use crate::{sso::Member, voteit::VoteItRequest};
+use crate::{db::Action, sso::Member, voteit::VoteItRequest};
 
 pub mod api;
 pub mod worker;
@@ -30,7 +30,7 @@ pub enum Error {
     VoteItRequestFail(#[from] reqwest::Error),
     #[error("VoteIT request queue full")]
     RequestQueueFull(
-        #[from] tokio::sync::mpsc::error::SendError<(Either<String, Uuid>, Member, VoteItRequest)>,
+        #[from] tokio::sync::mpsc::error::SendError<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>,
     ),
     #[error("Person is not a member and has no permissions")]
     NonMember,

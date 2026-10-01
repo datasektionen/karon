@@ -11,11 +11,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
-    client::{Event, KTH_ID, MEETING_ID},
-    db::{self, Db, Meeting},
-    server::Error,
-    sso::{self, Member, check_moderator},
-    voteit::{self, Permissions, VoteItRequest},
+    client::{Event, KTH_ID, MEETING_ID}, db::{self, Action, Db, Meeting}, server::Error, sso::{self, Member, check_moderator}, voteit::{self, Permissions, VoteItRequest},
 };
 
 #[derive(Deserialize)]
@@ -28,7 +24,7 @@ struct CardData {
 #[post("/card")]
 pub async fn card_api(
     db: Data<Db>,
-    tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest)>>,
+    tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>>,
     event_stream: Data<async_broadcast::Sender<(Either<String, Uuid>, Event)>>,
     form: web::Form<CardData>,
     token: actix_web::Either<BearerAuth, Session>,
@@ -83,7 +79,7 @@ pub async fn card_api(
 }
 
 pub async fn card(
-    tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest)>>,
+    tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>>,
     event_stream: Data<async_broadcast::Sender<(Either<String, Uuid>, Event)>>,
     user: Either<String, Uuid>,
     member_info: Member,
@@ -117,7 +113,7 @@ pub async fn card(
         voteit_token: meeting.voteit_token,
     };
 
-    tx.send((user, member_info, req)).await?;
+    tx.send((user, member_info, req, None)).await?;
 
     Ok(())
 }
@@ -162,7 +158,7 @@ pub struct OnboardData {
 #[post("/card/onboard")]
 pub async fn card_onboard_api(
     db: Data<Db>,
-    tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest)>>,
+    tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>>,
     event_stream: Data<async_broadcast::Sender<(Either<String, Uuid>, Event)>>,
     form: web::Form<OnboardData>,
     token: actix_web::Either<BearerAuth, Session>,

@@ -3,6 +3,7 @@
 use core::fmt;
 
 use chrono::{DateTime, Days, NaiveDate, Utc};
+use serde::Deserialize;
 use sqlx::{PgPool, postgres::PgQueryResult, types::Uuid};
 
 use crate::{server::Error, voteit::VoteItToken};
@@ -10,6 +11,32 @@ use crate::{server::Error, voteit::VoteItToken};
 #[derive(Clone)]
 pub struct Db {
     pool: PgPool,
+}
+
+/// The types of actions a member can take at a meeting.
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Action {
+    Entered,
+    Left,
+}
+
+impl fmt::Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Entered => write!(f, "Entered"),
+            Self::Left => write!(f, "Left"),
+        }
+    }
+}
+
+impl From<String> for Action {
+    fn from(value: String) -> Self {
+        match value.to_lowercase().as_str() {
+            "entered" => Self::Entered,
+            _ => Self::Left
+        }
+    }
 }
 
 /// Representation of a chapter meeting in the database.
@@ -29,6 +56,11 @@ pub struct Attendance {
     pub entered_at: DateTime<Utc>,
     pub left_at: Option<DateTime<Utc>>,
     pub suffrage: bool,
+}
+
+pub struct FailedSync {
+    pub kthid: String,
+    pub action: Action,
 }
 
 impl Db {
@@ -132,22 +164,6 @@ pub async fn is_meeting_active(db: &Db, id: Uuid) -> Result<bool, sqlx::Error> {
         .await
 }
 
-/// The types of actions a member can take at a meeting.
-#[derive(Clone, Copy, Debug)]
-pub enum Action {
-    Entered,
-    Left,
-}
-
-impl fmt::Display for Action {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Entered => write!(f, "Entered"),
-            Self::Left => write!(f, "Left"),
-        }
-    }
-}
-
 /// Lists all attendances for a given meeting orderd by the time they entered
 pub async fn list_attendance_for_meeting(
     db: &Db,
@@ -176,7 +192,7 @@ pub async fn update_attendance(
         r#"
         WITH updated AS (
             UPDATE attendances
-            SET left_at = $1
+            SET left_at = $1, synced_voteit = false
             WHERE meeting_id = $2 AND kthid = $3 AND left_at IS NULL
             RETURNING 'left' AS action
         ),
@@ -206,6 +222,26 @@ pub async fn update_attendance(
         "left" => Ok(Action::Left),
         _ => Ok(Action::Entered),
     }
+}
+
+pub async fn set_attendance_synced(db: &Db, kthid: &str) -> Result<PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        "UPDATE attendances SET synced_voteit = true WHERE kthid = $1",
+        kthid
+    )
+    .execute(db.pool())
+    .await
+}
+
+pub async fn list_unsynced_attendace(
+    db: &Db,
+    meeting_id: Uuid,
+) -> Result<Vec<FailedSync>, sqlx::Error> {
+    sqlx::query_as!(
+        FailedSync,
+        "SELECT kthid, CASE WHEN left_at IS NULL THEN 'left' ELSE 'entered' END as \"action!\" FROM attendances WHERE meeting_id = $1 AND synced_voteit = false",
+        meeting_id
+    ).fetch_all(db.pool()).await
 }
 
 pub async fn create_onboard_token(db: &Db) -> Result<Uuid, sqlx::Error> {
