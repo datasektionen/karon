@@ -12,7 +12,7 @@ use either::Either;
 
 /// Sets the max length of the multi-producer-single-consumer queue which all [`VoteItRequest`]s
 /// are added to.
-pub const WORKER_CHANNEL_SIZE: usize = 64;
+pub const WORKER_CHANNEL_SIZE: usize = 32;
 
 use crate::{
     client::Event,
