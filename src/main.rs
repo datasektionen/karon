@@ -4,22 +4,21 @@ use actix_session::{SessionMiddleware, storage::CookieSessionStore};
 use actix_web::{
     App, HttpServer,
     cookie::Key,
-    get,
-    http::header::ContentType,
     web::{self, Data, scope},
 };
 use actix_web_metrics::ActixWebMetricsBuilder;
 use jsonwebtoken::{DecodingKey, EncodingKey};
-use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
+use metrics_exporter_prometheus::PrometheusBuilder;
 use sqlx::PgPool;
 use tokio::sync::mpsc;
+use tracing::info;
 use tracing_actix_web::TracingLogger;
 
 use crate::{
     auth::AuthMiddleware,
     db::Db,
     oidc::OIDCClient,
-    server::worker::{self, work},
+    server::worker::{self, WORKER_CHANNEL_SIZE, work},
 };
 
 mod auth;
@@ -57,8 +56,11 @@ async fn main() -> std::io::Result<()> {
     ));
     let oidc_client = web::Data::new(OIDCClient::new().await.unwrap());
 
-    let (worker_tx, worker_rx) = mpsc::channel(worker::WORKER_CHANNEL_SIZE);
-    let (event_stream_tx, event_stream_rx) = async_broadcast::broadcast(64);
+    let (worker_tx, worker_rx) = mpsc::channel(WORKER_CHANNEL_SIZE);
+    let (event_stream_tx, event_stream_rx) = async_broadcast::broadcast(32);
+    let event_stream_rx = event_stream_rx.deactivate();
+
+    info!("event stream status: {}", event_stream_rx.is_closed());
 
     tokio::spawn(work(db.clone(), worker_rx, event_stream_tx.clone()));
 
@@ -123,7 +125,7 @@ async fn main() -> std::io::Result<()> {
                     .service(client::meeting_attendance)
                     .service(client::scan_kerberos)
                     .service(client::events)
-                    .service(client::retry_voteit)
+                    .service(client::retry_voteit),
             )
     })
     .bind(("0.0.0.0", port))?

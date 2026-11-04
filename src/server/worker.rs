@@ -12,7 +12,7 @@ use either::Either;
 
 /// Sets the max length of the multi-producer-single-consumer queue which all [`VoteItRequest`]s
 /// are added to.
-pub const WORKER_CHANNEL_SIZE: usize = 64;
+pub const WORKER_CHANNEL_SIZE: usize = 32;
 
 use crate::{
     client::Event,
@@ -47,32 +47,34 @@ pub async fn work(
             .await
             .expect("Could not connect to database");
 
-            match action {
-                Action::Entered => {
-                    let _ = event_stream
-                        .broadcast((
-                            user.clone(),
-                            Event::Joined {
-                                name: member.name.clone(),
-                                picture: member.picture,
-                                member_type: member.member_type,
-                            },
-                        ))
-                        .await
-                        .unwrap();
-                }
+            let event = match action {
+                Action::Entered => Event::Joined {
+                    name: member.name.clone(),
+                    picture: member.picture,
+                    member_type: member.member_type,
+                },
                 Action::Left => {
                     req.perms &= Permissions::default() | Permissions::MODERATOR;
-                    let _ = event_stream
-                        .broadcast((
-                            user.clone(),
-                            Event::Left {
-                                name: member.name.clone(),
-                                picture: member.picture,
-                            },
-                        ))
-                        .await
-                        .unwrap();
+                    Event::Left {
+                        name: member.name.clone(),
+                        picture: member.picture,
+                    }
+                }
+            };
+
+            match event_stream.try_broadcast((user.clone(), event)) {
+                Err(e) if e.is_full() => {
+                    log::warn!("event stream buffer full, dropping event");
+                }
+                Err(s) => {
+                    log::error!(
+                        "Error broadcasting event for user {}: {:?}",
+                        member.kth_id,
+                        s
+                    );
+                }
+                Ok(s) => {
+                    log::info!("Broadcasted event for user {}: {:?}", member.kth_id, s);
                 }
             };
 
@@ -103,17 +105,28 @@ pub async fn work(
                             &env::var("VOTEIT_URL").expect("VoteIT url not found"),
                         );
 
-                        let _ = event_stream
-                            .broadcast((
-                                user,
-                                Event::VoteITFailed {
-                                    kthid: member.kth_id,
-                                    name: member.name,
-                                    action,
-                                },
-                            ))
-                            .await
-                            .unwrap();
+                        match event_stream.try_broadcast((
+                            user,
+                            Event::VoteITFailed {
+                                kthid: member.kth_id.clone(),
+                                name: member.name,
+                                action,
+                            },
+                        )) {
+                            Err(e) if e.is_full() => {
+                                log::warn!("event stream buffer full, dropping event");
+                            }
+                            Err(s) => {
+                                log::error!(
+                                    "Error broadcasting event for user {}: {:?}",
+                                    member.kth_id,
+                                    s
+                                );
+                            }
+                            Ok(s) => {
+                                log::info!("Broadcasted event for user {}: {:?}", member.kth_id, s);
+                            }
+                        };
 
                         break;
                     }
