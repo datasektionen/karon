@@ -18,7 +18,7 @@ use crate::{
     auth::AuthMiddleware,
     db::Db,
     oidc::OIDCClient,
-    server::worker::{self, work},
+    server::worker::{self, WORKER_CHANNEL_SIZE, work},
 };
 
 mod auth;
@@ -56,8 +56,8 @@ async fn main() -> std::io::Result<()> {
     ));
     let oidc_client = web::Data::new(OIDCClient::new().await.unwrap());
 
-    let (worker_tx, worker_rx) = mpsc::channel(3);
-    let (event_stream_tx, event_stream_rx) = async_broadcast::broadcast(3);
+    let (worker_tx, worker_rx) = mpsc::channel(WORKER_CHANNEL_SIZE);
+    let (event_stream_tx, event_stream_rx) = async_broadcast::broadcast(32);
     let event_stream_rx = event_stream_rx.deactivate();
 
     info!("event stream status: {}", event_stream_rx.is_closed());
