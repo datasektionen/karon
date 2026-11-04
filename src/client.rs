@@ -10,7 +10,7 @@ use actix_web::{
 use askama::Template;
 use chrono::{DateTime, Local, NaiveDate};
 use either::Either;
-use metrics::{counter, gauge};
+use metrics::gauge;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 use thiserror::Error;
@@ -265,14 +265,16 @@ pub async fn activate_meeting(
 
 #[patch("/meeting/deactivate/{id}")]
 pub async fn deactivate_meeting(
-    tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest)>>,
+    tx: Data<
+        tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>,
+    >,
     event_stream: Data<async_broadcast::Sender<(Either<String, Uuid>, Event)>>,
     db: Data<Db>,
     id: web::Path<Uuid>,
     session: Session,
 ) -> Result<HttpResponse, ClientError> {
     let meeting = db::get_meeting(&db, *id).await?;
-    let present = db::list_present_at_meeting(&db, &*id).await?;
+    let present = db::list_present_at_meeting(&db, &id).await?;
     let user = session
         .get::<String>(KTH_ID)?
         .ok_or(ClientError::SessionDataError(KTH_ID.to_string()))?;
@@ -460,7 +462,7 @@ pub async fn retry_voteit(
 #[get("/events")]
 pub async fn events(
     session: Session,
-    rx: Data<async_broadcast::Receiver<(Either<String, Uuid>, Event)>>,
+    rx: Data<async_broadcast::InactiveReceiver<(Either<String, Uuid>, Event)>>,
     req: HttpRequest,
     stream: web::Payload,
 ) -> Result<HttpResponse, ClientError> {
@@ -471,7 +473,7 @@ pub async fn events(
         .get::<Scanner>(SCANNER)?
         .ok_or(ClientError::SessionDataError(SCANNER.to_string()))?;
 
-    let mut events = rx.get_ref().clone();
+    let mut events = rx.activate_cloned();
 
     let mut interval = tokio::time::interval(Duration::from_secs(6));
 

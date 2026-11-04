@@ -8,10 +8,15 @@ use actix_web::{
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use either::Either;
 use serde::Deserialize;
+use tracing_log::log;
 use uuid::Uuid;
 
 use crate::{
-    client::{Event, KTH_ID, MEETING_ID}, db::{self, Action, Db, Meeting}, server::Error, sso::{self, Member, check_moderator}, voteit::{self, Permissions, VoteItRequest},
+    client::{Event, KTH_ID, MEETING_ID},
+    db::{self, Action, Db, Meeting},
+    server::Error,
+    sso::{self, Member, check_moderator},
+    voteit::{self, Permissions, VoteItRequest},
 };
 
 #[derive(Deserialize)]
@@ -24,7 +29,9 @@ struct CardData {
 #[post("/card")]
 pub async fn card_api(
     db: Data<Db>,
-    tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>>,
+    tx: Data<
+        tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>,
+    >,
     event_stream: Data<async_broadcast::Sender<(Either<String, Uuid>, Event)>>,
     form: web::Form<CardData>,
     token: actix_web::Either<BearerAuth, Session>,
@@ -48,20 +55,36 @@ pub async fn card_api(
         Ok(member_info) => member_info,
         Err(error) => {
             match error {
-                Error::CardNotExisting(ref card_uid)
-                    if matches!(token, actix_web::Either::Right(_)) =>
-                {
-                    let _ = event_stream
-                        .broadcast((
-                            user,
-                            Event::Onboard {
-                                card_uid: card_uid.clone(),
-                            },
-                        ))
-                        .await
-                        .unwrap();
+                // if matches!(token, actix_web::Either::Right(_))
+                Error::CardNotExisting(ref card_uid) => {
+                    match event_stream.try_broadcast((
+                        user,
+                        Event::Onboard {
+                            card_uid: card_uid.clone(),
+                        },
+                    )) {
+                        Err(e) if e.is_full() => {
+                            log::warn!("event stream buffer full, dropping Onboard event");
+                        }
+                        Err(s) => {
+                            log::error!(
+                                "Error broadcasting Onboard event for card {}: {:?}",
+                                card_uid,
+                                s
+                            );
+                        }
+                        Ok(s) => {
+                            log::info!("Broadcasted Onboard event for card {}: {:?}", card_uid, s);
+                        }
+                    }
                 }
-                _ => {}
+                _ => {
+                    log::error!(
+                        "Error getting member info for card {}: {:?}",
+                        form.card_uid,
+                        error
+                    );
+                }
             }
             return Err(error);
         }
@@ -79,7 +102,9 @@ pub async fn card_api(
 }
 
 pub async fn card(
-    tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>>,
+    tx: Data<
+        tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>,
+    >,
     event_stream: Data<async_broadcast::Sender<(Either<String, Uuid>, Event)>>,
     user: Either<String, Uuid>,
     member_info: Member,
@@ -88,16 +113,31 @@ pub async fn card(
     let mut perms: Permissions = member_info.member_type.into();
 
     if !perms.contains(voteit::Permissions::PARTICIPANT) {
-        let _ = event_stream
-            .broadcast((
-                user,
-                Event::NonMember {
-                    name: member_info.name,
-                    picture: member_info.picture,
-                },
-            ))
-            .await
-            .unwrap();
+        match event_stream.try_broadcast((
+            user,
+            Event::NonMember {
+                name: member_info.name,
+                picture: member_info.picture,
+            },
+        )) {
+            Err(e) if e.is_full() => {
+                log::warn!("event stream buffer full, dropping NonMember event");
+            }
+            Err(s) => {
+                log::error!(
+                    "Error broadcasting NonMember event for user {}: {:?}",
+                    member_info.kth_id,
+                    s
+                );
+            }
+            Ok(s) => {
+                log::info!(
+                    "Broadcasted NonMember event for user {}: {:?}",
+                    member_info.kth_id,
+                    s
+                );
+            }
+        }
         return Err(Error::NonMember);
     }
 
@@ -158,7 +198,9 @@ pub struct OnboardData {
 #[post("/card/onboard")]
 pub async fn card_onboard_api(
     db: Data<Db>,
-    tx: Data<tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>>,
+    tx: Data<
+        tokio::sync::mpsc::Sender<(Either<String, Uuid>, Member, VoteItRequest, Option<Action>)>,
+    >,
     event_stream: Data<async_broadcast::Sender<(Either<String, Uuid>, Event)>>,
     form: web::Form<OnboardData>,
     token: actix_web::Either<BearerAuth, Session>,
